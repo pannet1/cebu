@@ -1,5 +1,5 @@
 {
-  "name": "arumugam-cebu",
+  "name": "cebu",
   "version": "1.0.0",
   "description": "cebu api order placement",
   "main": "server.js",
@@ -14,5 +14,18 @@
     "start": "node server.js"
   },
   "author": "pannet1@yahoo.com",
-  "license": "ISC"
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pannet1/cebu.git"
+  },
+  "keywords": [
+    "node",
+    "cebu",
+    "nse"
+  ],
+  "bugs": {
+    "url": "https://github.com/pannet1/cebu/issues"
+  },
+  "homepage": "https://github.com/pannet1/cebu#readme"
 }
