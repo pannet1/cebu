@@ -1,0 +1,4 @@
+1. unzip the contents of this zip file
+2. install nodejs
+3. run `node server.js`
+4. point your browser to localhost:8081

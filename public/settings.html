@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Settings</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <link href="style.css" rel="stylesheet" />    
+    <script src="clearall.js"></script>
+    <script>
+      async function fetchData() {
+      const root = document.getElementById("root");    
+      $.ajax({
+        url: "/settings.json",
+        contentType: 'application/json',        
+        crossDomain: true,
+        type: 'get',
+        success: function(data) {        
+        const root = document.getElementById('root');
+        const keys = Object.keys(data);
+            // iterate over object
+            if (keys) {
+              keys.forEach((key, index) => {      
+                root.innerHTML +=             
+                  "<form action='/update'><label for="+key+">"+key+":</label><input onblur='this.form.submit()'  value='"+data[key]+"' type='text' name="+key+" id="+key+"><input type='hidden' value='s'></form><br/>";        
+                });
+              } else {
+              root.innerHTML += "There was some problem in reading the settings file";
+              }        
+        },
+        error: function(errorThrown) {}  
+      })    
+      }
+      </script>
+  </head>
+  <body onload="fetchData()">
+    <div class="wrapper">
+      <div class="mw" id="mw"></div>
+      <div class="main">
+          <div class="content">            
+              <h2>Trade Settings</h2>                
+              <div id="root"></div>         
+              <div class="buttons">
+                  <input onclick="window.location.href='./reset'"style="font-size:x-large;" class="red" type="button" value="reset">
+                  <input onclick="window.location.href='./'"   style="font-size:x-large;" class="green" type="button" value="start algo">  
+              </div>        
+              <div class="msg" id="msg"></div>
+          </div>      
+      </div>
+    </div>
+  </body>
+</html>
