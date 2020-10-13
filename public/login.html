@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>login</title>
+    <link href="style.css" rel="stylesheet" />    
+    <script src="cookie.js"></script>        
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.0.0/crypto-js.min.js"></script>      
+    <script>
+    const userId = "TE185A01";
+    const apikey = "3dcNgLL4geEpRYqpgCTAlcZEU8ihcHjfW69sQ2aq1ma4Juu7CCs7m7dsha83VrdFI5Q9HMZzZSgQzPLebEnS1beEr8I3zCn3Q1WQrhCNEE0Y4HAvfI2ULpfXmW0Vdf3d";
+    const _getSessionId = (enckey) => {
+    var plainText = userId + apikey + enckey;
+    $("#root").append("plainText: " + plainText + "<br>");
+    var hashText = CryptoJS.SHA256(plainText);
+    $("#root").append("hashText: " + hashText + "<br>");
+    var encpData = hashText.toString(CryptoJS.Base64);
+    $("#root").append("encpData: " + encpData + "<br>");  
+    var jsonObj = {
+      "userId":userId,
+      "userData":encpData
+    };
+      $.ajax({
+      url: "https://www.zebull.in/rest/MobullService/api/customer/getUserSID",
+      contentType: 'application/json',
+      data: JSON.stringify(jsonObj),
+      crossDomain: true,
+      type: 'post',
+      success: function(data) {
+        if (data.stat == "Ok") {
+          var sid = data.sessionID;
+          $("#root").append("sid: " + sid+ "<br>");
+          createCookie('sid',sid,0);              
+          location.href = "/index.html";  
+        }
+        var emsg = data.emsg;
+        $("#err").append(emsg);
+
+      },
+      error: function(errorThrown) {}
+    });
+  }
+
+  const _getZebuKey = () => {                         
+    var jsonObj = {
+      "userId": userId
+    };
+    $.ajax({
+      url: "https://www.zebull.in/rest/MobullService/api/customer/getAPIEncpkey",
+      contentType: 'application/json',
+      data: JSON.stringify(jsonObj),
+      crossDomain: true,
+      type: 'post',
+      success: function(data) {
+        var enckey = data.encKey;
+        $("#root").append("enkey: " + enckey + "<br>");
+        _getSessionId(enckey);
+        var emsg = data.emsg;
+        $("#msg").append(emsg);
+      },
+      error: function(errorThrown) {}
+    });
+  }
+    
+  const index = () => {
+    $.ajax({
+    url: "/factor",
+    contentType: 'application/json',        
+    crossDomain: true,
+    type: 'get',
+    success: function(data) {          
+      $("#root").append("factor: " + data.factor + "<br>");         
+      createCookie('factor',data.factor,0); 
+      _getZebuKey();
+    },
+    error: function(errorThrown) {
+
+    }
+    });
+  }
+
+index();
+</script>
+<script>
+
+var tgtTimezone = 5.50; //target time zone 
+var tgtHours    = 9.15;
+
+
+var srcClockId, tgtClockId, countDownId
+var d = new Date();  
+//get the timezone offset from local time in minutes
+var tzDiff = tgtTimezone * 60 + d.getTimezoneOffset();
+//convert the offset to milliseconds, add to targetTime
+var diffMsOffset = tzDiff * 60 * 1000;
+var timeleft   = ((tgtHours + 5.50) * 60) + d.getTimezoneOffset();
+
+function countDown() {
+    var tDate = new Date( new Date().getTime() + diffMsOffset ) ;    
+    var in_hours   =  timeleft - (tDate.getHours()  * 60)
+    var in_minutes =  in_hours - tDate.getMinutes();
+    
+    var diff = in_hours + in_minutes;
+  
+    consol =  document.getElementById('console');
+    if (diff<0) {
+        KillClock();
+        index(); }
+    else      
+      consol.innerHTML = in_minutes;
+      //console.log("minutes left: ",in_minutes);                 
+}
+
+function UpdateClock(offset) {
+    var tDate = new Date(new Date().getTime()+offset);
+    var in_hours = tDate.getHours()
+    var in_minutes=tDate.getMinutes();
+    var in_seconds= tDate.getSeconds();
+
+    if(in_minutes > 0)
+        in_minutes = in_minutes;
+    if(in_seconds<10)   
+        in_seconds = '0'+in_seconds;
+    if(in_hours<10) 
+        in_hours = '0'+in_hours;
+  
+   //console.log(in_hours + ":" + in_minutes + ":" + in_seconds);
+   consol =  document.getElementById('console');
+   consol.innerHTML = in_hours + ":" + in_minutes + ":" + in_seconds;
+   
+}
+
+function StartClock() {
+   tgtClockId = setInterval(UpdateClock(diffMsOffset), 500);
+   srcClockId = setInterval(UpdateClock(0), 500);
+   countDownId = setInterval(countDown(),500);
+}
+
+function KillClock() {
+  clearTimeout(srcClockId);
+  clearTimeout(tgtClockId);    
+  clearTimeout(countDownId)  
+}
+</script>
+</head>
+<body>
+    <div class="wrapper">
+      <div class="mw" id="mw">
+      </div>
+      <div class="main">
+        <div class="content">
+          <div>
+            <table>
+              <tbody id="root">
+              </tbody>            
+            </table>                  
+          </div>                 
+        </div><!-- content -->
+      <div id="console" class="console break-word"></div>    
+      <div id="err" class="err"><a href="https://zebull.in">login zebu first</a>
+          <br/>
+          <br/>
+      </div>
+    </div><!-- main -->
+</div><!-- wrapper -->
+</body>
+<script>
+  window.onload=function() {
+ // StartClock();
+  }
+</script>
+</html>

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Arumugam</title>    
+    <link href="style.css" rel="stylesheet" />
+    <script src="axios.min.js"></script>
+    <script src="interact.js"></script>
+  </head>
+
+  <body onload="index()">
+    <div class="wrapper">
+          
+        <div class="mw">
+            <ul id="mw">          
+            </ul>
+         </div>      
+
+        <div class="main">        
+            <div class="content">
+                <div id="menu" class="menu">
+                  <button class="btn active" onclick="window.location.href='./index.html'">algo</button>
+                  <button class="btn" onclick="pstPositions()">positions</button>
+                  <button class="btn" onclick="getOrders()">orders</button>
+                  <button class="btn" onclick="window.location.href='./settings.html'">settings</button>
+                  <a id="auth" href="./logout.html">logout</a>
+                </div>            
+                <div id="progress">
+                    <div id="bar">
+                    </div>
+                </div>
+                <div>
+                    <table>
+                      <tbody id="root">
+                      </tbody>            
+                    </table>                  
+                </div>                 
+            </div><!-- content -->
+            <div id="console" class="console break-word"></div>    
+            <div id="err" class="err"></div>
+        </div><!-- main -->
+
+    </div><!-- wrapper -->
+  </body>
+  <script type="text/javascript">
+    // Get the container element
+    var btnContainer = document.getElementById("menu");
+
+    // Get all buttons with class="btn" inside the container
+    var btns = btnContainer.getElementsByClassName("btn");
+
+    // Loop through the buttons and add the active class to the current/clicked button
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].addEventListener("click", function() {
+        var current = document.getElementsByClassName("active");
+        current[0].className = current[0].className.replace(" active", "");
+        this.className += " active";
+      });
+    }
+  </script>
+
+</html>

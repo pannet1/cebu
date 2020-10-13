@@ -1,0 +1,18 @@
+{
+  "name": "arumugam-cebu",
+  "version": "1.0.0",
+  "description": "cebu api order placement",
+  "main": "server.js",
+  "dependencies": {
+    "axios": "^0.20.0",
+    "compression": "^1.7.4",
+    "express": "^4.17.1"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "author": "pannet1@yahoo.com",
+  "license": "ISC"
+}
