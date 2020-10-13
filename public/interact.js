@@ -5,15 +5,7 @@
 /* private functions */
 const CE = 'CE';
 const PE = 'PE';
-const millisecs = 10000;
-
-// redirect to url
-const _redirect = (url="/", ms=millisecs) => {
-    console.log("redirecting after ms", ms);
-    sleep(ms).then( () => {               
-        location.href = url;  
-    })         
-}
+const millisecs = 5000;
 
 // progress indicator
 const _show_progress = (Start, Ltp, Buy, Sel, lt_txt="Open", rt_txt="Trigger") => {    
@@ -23,18 +15,26 @@ const _show_progress = (Start, Ltp, Buy, Sel, lt_txt="Open", rt_txt="Trigger") =
     root.innerHTML = "<tr><th style='text-align:left'>"+lt_txt+"</td>"+
                     "<th>LTP</td>"+   
                     "<th style='text-align:right'>"+rt_txt+"</td></tr>";                    
-    if (Ltp < Start && Ltp>Sel) {
+    if (Ltp < Start) {
         width = (Start-Ltp) / (Start-Sel) * 100;
         elem.style.width = width + "%";        
-        elem.classList.add("red");              
+        if(Buy>Start)
+            elem.classList.add("red");              
+        else {
+            elem.classList.add("green");                  
+        }
         root.innerHTML += "<tr><td style='text-align:left'>"+Start+"</td>"+
                     "<td>"+Ltp+"</td>"+   
                     "<td style='text-align:right'>"+Sel+"</td></tr>";   
      }    
-    if (Ltp > Start && Ltp<Buy) {        
+    if (Ltp > Start) {        
         width = (Ltp-Start) / (Buy-Start) * 100;
         elem.style.width = width + "%";        
-        elem.classList.add("green");              
+        if(Buy>Start)
+            elem.classList.add("green");              
+        else {
+            elem.classList.add("red");                
+        }
         root.innerHTML += "<tr><td style='text-align:left'>"+Start+"</td>"+
                         "<td style='text-align:center'>"+Ltp+"</td>"+
                         "<td style='text-align:right'>"+Buy+"</td></tr>";    
@@ -42,7 +42,7 @@ const _show_progress = (Start, Ltp, Buy, Sel, lt_txt="Open", rt_txt="Trigger") =
     if (width ==0) {
         root.innerHTML += "<tr><td style='text-align:left'>"+Start+"</td>"+
         "<td>"+Ltp+"</td>"+   
-        "<td style='text-align:right'>&nbsp;</td></tr>";  
+        "<td style='text-align:right'>&nbsp;</td>"+Buy+" / "+Sel+"</tr>";  
     } 
 };
 
@@ -61,56 +61,17 @@ function _getScripTokens () {
 });
 };
 
-
-/* not using 
+/* order status */
 const _orderStatus = () => {    
     return zebu.get('api/placeOrder/fetchOrderBook')
     .then(function(response){
         return response.data;
     });    
-}           
-const safetyStop = (direction=0,price=0) => {   
-    let isStop = 0;
-    _orderStatus().then((orders) => {                   
-        if (orders.stat != "Not_Ok") {                   
-            let noOfOrders = orders.length;                       
-            if (noOfOrders == null)  { noOfOrders = 0 }
-            console.log("no of orders found ", noOfOrders);           
-            
-            for(let j = 0; j < noOfOrders; j++) {                                                
-                if( orders[j].Trsym == pe1 && direction == -1 && orders[j].Status == "trigger pending") {
-                    isStop = parseInt(orders[j].Nstordno)
-                }
-                if( orders[j].Trsym == ce1 && direction == 1 && orders[j].Status == "trigger pending") {
-                    isStop = parseInt(orders[j].Nstordno)
-                }                    
-            } // end of for             
-
-            // place stop orders
-            if (price < 0) price = 1;
-            if (direction == -1 && isStop == 0) {                    
-                _pstPlaceOrder ("SELL", pe1, putTkn, qty=trade.qty1, ordr_typ="SL-M", prc=price); 
-            }
-            if (direction == 1 && isStop == 0) {
-                _pstPlaceOrder ("SELL", ce1, callTkn, qty=trade.qty1, ordr_typ="SL-M", prc=price); 
-            }    
-        }  // orders.stat                 
-    });                   
-    return isStop;         
-}    
-*/
-
-const _pstOrderHistory = (id) => {
-    return zebu.post('api/placeOrder/orderHistory', { "nestOrderNumber": id })
-    .then(function(response){
-        return response.data;
-    })    
-}
-
-/* get order price by nest order id */
+}                
 
 /* modify order */      
 const _pstModifyOrder = (sym, qty="1", ordr_typ="MKT", prc="", ordr_num ) => {
+    if (ordr_num == 0) console.log("WARNING: Tried to modify an order with no #")
     zebu.post('api/placeOrder/modifyOrder', [{                         
         "discqty": "0",
         "exch": "NFO",
@@ -143,11 +104,11 @@ const _pstModifyOrder = (sym, qty="1", ordr_typ="MKT", prc="", ordr_num ) => {
 
 /* place order */
 const _pstPlaceOrder = (trans, sym, tok, qty="1", ordr_typ="MKT", prc="" ) => {
-    return zebu.post('api/placeOrder/executePlaceOrder', [{                 
+    zebu.post('api/placeOrder/executePlaceOrder', [{                 
         "complexty": "regular",
         "discqty": "0",
         "exch": "NFO",
-        "pCode": "NRML",
+        "pCode": "MIS",
         "prctyp": ordr_typ,     
         "price": prc,
         "qty": qty,
@@ -157,7 +118,23 @@ const _pstPlaceOrder = (trans, sym, tok, qty="1", ordr_typ="MKT", prc="" ) => {
         "transtype": trans,
         "trigPrice": prc
     }])
-    .then(function (response){ return response.data; })        
+        .then(response => {
+        const data = response.data;  
+        appendToDOM(response, "placing order");
+        if (data.stat == "Ok" && parseInt(data.nestOrderNumber) > 0) {   
+            const log = document.querySelector('.console');
+            log.textContent = "Order Placed Successfully";                 
+        } else if (data.emsg) {
+            const err = document.querySelector('.err');
+            err.textContent = err.textContent + data.emsg + '\n';     
+        }
+    })
+    .catch(function (error) {
+            if (error.response) {                
+              console.log(error.response.data);
+              console.log(error.response.status);              
+            }
+    })            
 };
 
 const _findITMStrike = (quote,option,strikeDiff=100) => {
@@ -178,6 +155,13 @@ const _findITMStrike = (quote,option,strikeDiff=100) => {
 }
 
 /* helpers */
+const _redirect = (url="/", ms=millisecs) => {
+    console.log("redirecting after ms", ms);
+    sleep(ms).then( () => {               
+        location.href = url;  
+    })         
+}
+
 function createCookie(name,value,days) {
     let expires
     if (days) {
@@ -200,7 +184,7 @@ function readCookie (name) {
 	return null;
 }
 
-const sleep = (ms=millisecs) => {
+const sleep = (ms) => {
     console.log("sleeping for "+(ms/1000).toFixed(3)+" secs");
 return new Promise(resolve => setTimeout(resolve, ms))
 }  
@@ -221,33 +205,32 @@ const appendToDOM = (response, who="") => {
 
 /*                      algo part                        */
 /* 5 trade logic */
-const longOnlyTrades = (ul, call, put) => {                 
-        
+const longOnlyTrades = (ul, call, put) => {             
+    
+    console.log("looking to trade for ul ",`${ul}`);      
+    
     let ce1        = readCookie(call);
     let pe1        = readCookie(put);    
-    
+     
     let ulTkn      = localStorage.getItem(ul1);    
-    let callTkn    = localStorage.getItem(ce1);
-    let putTkn     = localStorage.getItem(pe1);           
+    let callTkn    = localStorage.getItem(call);
+    let putTkn     = localStorage.getItem(put);            
     
-    console.log("call token",callTkn);
-
-    let direction = 0;      
-    let price      = 0;
-    let noOfTrades = 0;
-    let orderId    = 0;
+    let direction  = 0;  
+    let isStop     = 0;
+    let price      = 0;    
     
     axios.all([
         zebu.post('api/positionAndHoldings/positionBook', { "ret":"NET"}),                
         zebu.post('api/ScripDetails/getScripQuoteDetails', {"exch":"NFO","symbol":ulTkn })        
     ])    
-    .then(responseArr => {                          
+    .then(responseArr => {              
+            
             tradeData = responseArr[0].data;
             appendToDOM(responseArr[0], "trade data");                                    
-            // are we in any position            
-            if (tradeData.stat =="Ok") {                   
-                noOfTrades = tradeData.length;
-                for(let i = 0; i < noOfTrades; i++) {                            
+            // are we in any position
+            if (tradeData) {                   
+                for(let i = 0; i < tradeData.length; i++) {                            
                     // PUT sell
                     if( tradeData[i].Tsym == pe1 && tradeData[i].Netqty > 0) {
                         direction = -1;    price = tradeData[i].NetBuyavgprc - trade.stop1;                              
@@ -258,13 +241,48 @@ const longOnlyTrades = (ul, call, put) => {
                     }
                     console.log("net qty ",tradeData[i].Netqty)
                 }
-            }               
+            } else {                                
+                direction = 0;
+                console.log("no trade data")
+            }     
             
-            // exits and entry     
+            // is stop in place. get stop loss                      
+            _orderStatus().then((orders) => {                   
+                if (orders) {                                  
+                    noOfOrders = orders.length;                              
+
+                    if (noOfOrders === null || typeof noOfOrders === 'undefined')                         
+                        noOfOrders = 0 
+                    else {
+                        console.log("no of orders is no zero ",noOfOrders);
+                    }                                 
+
+                    for(let j = 0; j < noOfOrders; j++) {                                                
+                        if( orders[j].Trsym == pe1 && orders[j].Status == "trigger pending") {                            
+                            isStop = parseInt(orders[j].Nstordno)
+                        }
+                        if( orders[j].Trsym == ce1 && orders[j].Status == "trigger pending") {
+                            isStop = parseInt(orders[j].Nstordno)
+                        }                                            
+                    } // end for                     
+                    console.log("stop zzz is: ", isStop, "stop price is ", price);     
+                    
+                    // place stop orders
+                    if (price <= 0) price = 1;
+                    if (direction == -1 && isStop == 0) {                    
+                        _pstPlaceOrder ("SELL", pe1, putTkn, qty=trade.qty1, ordr_typ="SL-M", prc=price); 
+                    }
+                    if (direction == 1 && isStop == 0) {
+                        _pstPlaceOrder ("SELL", ce1, callTkn, qty=trade.qty1, ordr_typ="SL-M", prc=price); 
+                    }    
+                }  // orders.stat                 
+            });
+            
+
             ulData = responseArr[1].data;         
-            appendToDOM(responseArr[1], "Underlying data");                    
-            
-            if (ulData.stat == "Ok") {                                     
+            appendToDOM(responseArr[1], "Underlying data");        
+            // exits and entry     
+            if (ulData.stat = "Ok") {                                
                 open = parseInt(ulData.openPrice);          
                 const entrypts  = parseInt(open * factor * 0.236);                      
                 const buyEntry  = open + entrypts;
@@ -276,12 +294,16 @@ const longOnlyTrades = (ul, call, put) => {
                     { 
                         if 
                         (
-                        (ulData.LTP > ( open + tgtinpts)) ||
-                        (ulData.LTP < ( open - trade.stop1 ))    
-                        ){
-                          _pstModifyOrder (ce1, callTkn, qty=trade.qty1, ordr_typ="MKT", prc="");
+                        ( ulData.LTP > ( open + tgtinpts)) 
+                        // || (  ulData.LTP < ( open - trade.stop1 ))    
+                        ){                            
+                          _pstModifyOrder (ce1, qty=trade.qty1, ordr_typ="MKT", prc=price, isStop);
                         }
-                        _show_progress (buyEntry, ulData.LTP, open+tgtinpts, open-trade.stop1, "Entry","Exit");                                                   
+                        
+                        if(buyEntry < open+tgtinpts )
+                        _show_progress (buyEntry, ulData.LTP, open+tgtinpts, open-trade.stop1, "Entry","Target");                           
+                        else
+                        _show_progress (buyEntry, ulData.LTP, open+tgtinpts, open-trade.stop1, "Entry","Stop");                                  
                      }                       
 
                 // long put option exit
@@ -289,92 +311,47 @@ const longOnlyTrades = (ul, call, put) => {
                     {
                         if
                         (
-                        (ulData.LTP < ( open - tgtinpts)) ||
-                        (ulData.LTP < ( open + trade.stop1 )) 
+                        (ulData.LTP < ( open - tgtinpts)) 
+                        // || (ulData.LTP > ( open + trade.stop1 )) 
                         ){ 
-                            _pstModifyOrder (pe1, putTkn, qty=trade.qty1, ordr_typ="MKT", prc="");  
+                            _pstModifyOrder (pe1, qty=trade.qty1, ordr_typ="MKT", prc="", isStop);  
                         }       
                         _show_progress (sellEntry, ulData.LTP, open-tgtinpts, open+trade.stop1,"Entry","Exit");                            
                     }              
-                
+                                
+                console.log("no of orders ",noOfOrders, "/ allowed orders ", parseInt(trade.allowed * 2) - 1);
 
                 if ( // entries
-                    (noOfTrades < parseInt(trade.allowed) )
-                    && (direction == 0)
-                ) 
-                {                      
+                    (noOfOrders < parseInt(trade.allowed * 2) - 1)
+                    && (direction == 0) 
+                ) {                    
                     
-                    if ( // long call option entry                   
-                        ulData.LTP >= (open + entrypts) 
+                    if (      // long call option entry                   
+                        ulData.LTP >= (open + entrypts) && trade.sellorbuy >=0
                         && ulData.LTP <= (open + entrypts + parseInt(trade.slip)) 
                     ) 
-                    {   
-                        direction = 1;                       
-                        _pstPlaceOrder ("BUY", ce1, callTkn, qty=trade.qty1, ordr_typ="MKT", prc="")
-                        .then((data ) => {                                                                                    
-                            if (data.stat == "Ok") {               
-                                const log = document.querySelector('.console');
-                                log.textContent = "Order " + data.nestOrderNumber + " Placed Successfully";                            
-                                orderId = data.nestOrderNumber;                                            
-                                if (orderId > 0) pstOrderHistory(orderId).then((history) => {                   
-                                    if (history.stat == "Ok") {                 
-                                        price = history.Prc - trade.stop1;
-                                        if (price<=0) price=1;
-                                        console.log("price from order id ",price);
-                                       _pstPlaceOrder ("SELL", ce1, callTkn, qty=trade.qty1, ordr_typ="SL-M", prc=price);                                                
-                                    }
-                                })                                             
-                            } else  {
-                                const err = document.querySelector('.err');
-                                err.textContent = err.textContent + data.emsg + '\n';                                                 
-                            }                                                
-                        });
-                        sleep(4000).then( () => {  longOnlyTrades('ul1', 'ce1', 'pe1'); })
+                    { 
+                        _pstPlaceOrder ("BUY", ce1, callTkn, qty=trade.qty1, ordr_typ="MKT"); 
                     }
-                    
-                    if ( // long put option entry                                                             
-                         ulData.LTP <= ( open - entrypts)                          
-                         && ulData.LTP >= ( open - entrypts - parseInt(trade.slip))
-                    ) {                                               
-                        direction = -1;                        
-                        _pstPlaceOrder ("BUY", pe1, putTkn, qty=trade.qty1, ordr_typ="MKT", prc="")
-                        .then((data ) => {                                                                                    
-                            console.log("bought put ", orderId);
-                            if (data.stat == "Ok") {  
-                                const log = document.querySelector('.console');
-                                log.textContent = "Order " + data.nestOrderNumber + " Placed Successfully";                            
-                                orderId = data.nestOrderNumber;    
 
-                                if (orderId > 0) _pstOrderHistory(orderId).then((history) => {                   
-                                  if (history.stat == "Ok") {                 
-                                        price = history.Prc - trade.stop1;
-                                        if (price<=0) price=1;
-                                        console.log("price from order id ",price);                                
-                                       _pstPlaceOrder ("SELL", pe1, putTkn, qty=trade.qty1, ordr_typ="SL-M", prc=price);     
-                                    }
-                                })  
-                            } else  {
-                                const err = document.querySelector('.err');
-                                err.textContent = err.textContent + data.emsg + '\n';                                                 
-                            }
-                        });
-                        sleep(5000).then( () => {  longOnlyTrades('ul1', 'ce1', 'pe1'); })
+                    if (      // long put option entry                                                             
+                         ulData.LTP <= ( open - entrypts) && trade.sellorbuy <=0
+                         && ulData.LTP >= ( open - entrypts - parseInt(trade.slip))
+                    ) { 
+                        _pstPlaceOrder ("BUY", pe1, putTkn, qty=trade.qty1, ordr_typ="MKT", prc=""); 
                     }    
-                    _show_progress (open, ulData.LTP, buyEntry, sellEntry);                             
                 } // end of entries                                   
-                    
-            } 
-            // end of response arr2                  
-      })
+                console.log("looking to buy @", buyEntry, " and sell @", sellEntry);
+                _show_progress (open, ulData.LTP, buyEntry, sellEntry, "Open","Target"); 
+                
+            }                       
+      }) // end of response arr2                      
       .catch(function (error) {
         if (error.response) {
           console.log(error.response.data);
           console.log(error.response.status);              
-            }
-        });           
-
-    sleep(4000).then( () => {  longOnlyTrades('ul1', 'ce1', 'pe1'); })                            
-
+        }
+        });                                                   
 }
 
 /* 4 generate long option scrip names from unerlying */
@@ -424,9 +401,7 @@ const tknFmScrip = (scrip) => {
                 }
                 
             }) 
-            .catch(function (error) {
-                // TODO
-                //_redirect("/login")        
+            .catch(function (error) {                   
                 if (error.response) {
                   console.log(error.response.data);
                   console.log(error.response.status);                        
@@ -445,8 +420,9 @@ function getSettings() {
 const _setZebuAxios = () => {
     factor = parseFloat(readCookie("factor"));    
     const sid = readCookie("sid");    
-    if (sid == null || factor == null) {             
-        _redirect("/login",0)                   
+    if (sid == null || factor == null) {     
+        // TODO
+        _redirect("/login",0)                          
     } else {                        
         zebu = axios.create();
         zebu.defaults.headers.common['Content-Type'] = "text/plain";
@@ -470,7 +446,8 @@ function index() {
     .then((result) => {
         trade = result;        
         ul1 = trade.base1+trade.month+'FUT'; 
-        ulTkn = localStorage.getItem(ul1);                 
+        const ulTkn = localStorage.getItem(ul1);                 
+        const cookieUl1 = readCookie(ul1);        
         
         // 3.get token of underlying             
         if(ulTkn == null  ) {
@@ -479,31 +456,28 @@ function index() {
         }  else {
             console.log("token found for ul ", ul1 );            
         }      
-       
-        cookieUl1 = readCookie(ul1)
+        
         // 4. get long options scrip name from underlying                       
         if ( cookieUl1 == null && ulTkn != null) {                                        
             console.log("building long scrip list for ul "+ ul1+ " with token "+ ulTkn )            
             longScripsFromUl(ul1, ulTkn);                                              
-        }   
+        }  
 
         // 5. take trades with instruments
         if ( cookieUl1 != null && ulTkn != null) {                                   
-            const ce1 = readCookie("ce1"); 
-            const pe1 = readCookie("pe1");
-            if(ce1!=null && pe1!=null) longOnlyTrades('ul1', 'ce1', 'pe1'); 
-            else console.log("no cookie");
-                
-                      
-        } else {
-            console.log("cookie ul is "+cookieUl1+" and ulTkn is "+ulTkn);
-            sleep().then( () => {
-                index();
-           })                               
-        }
+            ce1 = readCookie("ce1"); 
+            pe1 = readCookie("pe1");
+            if(ce1!=null && pe1!=null) {
+                longOnlyTrades('ul1', 'ce1', 'pe1'); 
+            }             
+        }        
+        console.log("cookie ul is "+cookieUl1+" and ulTkn is "+ulTkn);
 
-    });  
-          
+    });  // end of get settings
+
+    sleep(millisecs).then( () => {
+        index();
+    })                        
 }
 /** ------------------------ end of bootstrap ------------------------- */
 
@@ -528,7 +502,7 @@ const pstPositions = () => {
                             "<td>"+data[i].NetBuyavgprc+"</td>"+                    
                             "<td>"+data[i].NetSellavgprc+"</td>"+                                                    
                             "<td>"+data[i].LTP+"</td>"+                    
-                            "<td>"+data[i].unrealisedprofitloss+"</td><tr>";                                               
+                            "<td>"+data[i].MtoM+"</td><tr>";                                               
                     }                          
                 }            
             if (data.emsg == "No Data") {

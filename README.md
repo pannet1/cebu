@@ -1,0 +1,3 @@
+- install nodejs in checkout folder with `npm install`
+- run `npm start`
+- point your browser to localhost:8081

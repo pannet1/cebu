@@ -12,6 +12,7 @@
     <script>
     const userId = "TE185A01";
     const apikey = "3dcNgLL4geEpRYqpgCTAlcZEU8ihcHjfW69sQ2aq1ma4Juu7CCs7m7dsha83VrdFI5Q9HMZzZSgQzPLebEnS1beEr8I3zCn3Q1WQrhCNEE0Y4HAvfI2ULpfXmW0Vdf3d";
+    
     const _getSessionId = (enckey) => {
     var plainText = userId + apikey + enckey;
     $("#root").append("plainText: " + plainText + "<br>");
@@ -82,94 +83,111 @@
     });
   }
 
-index();
-</script>
-<script>
 
-var tgtTimezone = 5.50; //target time zone 
-var tgtHours    = 9.15;
+    var tgtTimezone = 5.50; //target time zone 
+    var tgtHours    = 17.05;
+
+    var srcClockId, tgtClockId, countDownId
+    var d = new Date();  
+    //get the timezone offset from local time in minutes
+    var tzDiff = tgtTimezone * 60 + d.getTimezoneOffset();
+    //convert the offset to milliseconds, add to targetTime
+    var diffMsOffset = tzDiff * 60 * 1000;
+    var timeleft   = ((tgtHours + 5.50) * 60) + d.getTimezoneOffset();
 
 
-var srcClockId, tgtClockId, countDownId
-var d = new Date();  
-//get the timezone offset from local time in minutes
-var tzDiff = tgtTimezone * 60 + d.getTimezoneOffset();
-//convert the offset to milliseconds, add to targetTime
-var diffMsOffset = tzDiff * 60 * 1000;
-var timeleft   = ((tgtHours + 5.50) * 60) + d.getTimezoneOffset();
-
-function countDown() {
+    function countDown() {
+    var consol =  document.getElementById('console');
     var tDate = new Date( new Date().getTime() + diffMsOffset ) ;    
     var in_hours   =  timeleft - (tDate.getHours()  * 60)
-    var in_minutes =  in_hours - tDate.getMinutes();
-    
-    var diff = in_hours + in_minutes;
-  
-    consol =  document.getElementById('console');
-    if (diff<0) {
-        KillClock();
-        index(); }
-    else      
-      consol.innerHTML = in_minutes;
-      //console.log("minutes left: ",in_minutes);                 
-}
+    var in_minutes =  in_hours - tDate.getMinutes(); 
+    var in_secs    =  60 - tDate.getSeconds();
+      if (in_secs <10) {
+        in_secs = "0"+in_secs;
+      }
+       
+      consol.innerHTML = consol.innerHTML + in_minutes + ":" + in_secs;  
+      if (in_minutes<=0) {
+          KillClock();
+          index();
+      }
+    }
 
-function UpdateClock(offset) {
-    var tDate = new Date(new Date().getTime()+offset);
-    var in_hours = tDate.getHours()
-    var in_minutes=tDate.getMinutes();
-    var in_seconds= tDate.getSeconds();
+    function srcClock() {
+        var tDate = new Date(new Date().getTime()+diffMsOffset);
+        var in_hours = tDate.getHours()
+        var in_minutes=tDate.getMinutes();
+        var in_seconds= tDate.getSeconds();
+        var consol =  document.getElementById('console');
+        
+        if(in_minutes <10)
+            in_minutes = '0'+in_minutes;
+        if(in_seconds<10)   
+            in_seconds = '0'+in_seconds;
+        if(in_hours<10) 
+            in_hours = '0'+in_hours;      
+      
+      consol.innerHTML = "Your time: "      
+      //console.log(in_hours + ":" + in_minutes + ":" + in_seconds);   
+      consol.innerHTML = consol.innerHTML + in_hours + ":" + in_minutes + ":" + in_seconds + "<br>";   
+    }
 
-    if(in_minutes > 0)
-        in_minutes = in_minutes;
-    if(in_seconds<10)   
-        in_seconds = '0'+in_seconds;
-    if(in_hours<10) 
-        in_hours = '0'+in_hours;
-  
-   //console.log(in_hours + ":" + in_minutes + ":" + in_seconds);
-   consol =  document.getElementById('console');
-   consol.innerHTML = in_hours + ":" + in_minutes + ":" + in_seconds;
-   
-}
+    function tgtClock() {
+        var tDate = new Date(new Date().getTime());
+        var in_hours = tDate.getHours()
+        var in_minutes=tDate.getMinutes();
+        var in_seconds= tDate.getSeconds();
+        var consol =  document.getElementById('console');
+        
+        if(in_minutes < 10)
+          in_minutes = '0'+in_minutes;  
+        if(in_seconds<10)   
+            in_seconds = '0'+in_seconds;
+        if(in_hours<10) 
+            in_hours = '0'+in_hours;      
+      
+      consol.innerHTML = consol.innerHTML + "NSEx time: "            
+      consol.innerHTML = consol.innerHTML + in_hours + ":" + in_minutes + ":" + in_seconds + "<br>";   
+    }
 
-function StartClock() {
-   tgtClockId = setInterval(UpdateClock(diffMsOffset), 500);
-   srcClockId = setInterval(UpdateClock(0), 500);
-   countDownId = setInterval(countDown(),500);
-}
-
-function KillClock() {
-  clearTimeout(srcClockId);
-  clearTimeout(tgtClockId);    
-  clearTimeout(countDownId)  
-}
-</script>
-</head>
-<body>
-    <div class="wrapper">
-      <div class="mw" id="mw">
-      </div>
-      <div class="main">
-        <div class="content">
-          <div>
-            <table>
-              <tbody id="root">
-              </tbody>            
-            </table>                  
-          </div>                 
-        </div><!-- content -->
-      <div id="console" class="console break-word"></div>    
-      <div id="err" class="err"><a href="https://zebull.in">login zebu first</a>
-          <br/>
-          <br/>
-      </div>
-    </div><!-- main -->
-</div><!-- wrapper -->
-</body>
-<script>
-  window.onload=function() {
- // StartClock();
+  function StartClock() {
+    srcClockId = setInterval(srcClock, 500);
+    tgtClockId = setInterval(tgtClock, 500);   
+    countDownId = setInterval(countDown,500);
   }
-</script>
-</html>
+
+  function KillClock() {
+    clearTimeout(srcClockId);
+    clearTimeout(tgtClockId);    
+    clearTimeout(countDownId)  
+  }
+  </script>
+  </head>
+  <body>
+      <div class="wrapper">
+        <div class="mw" id="mw">
+        </div>
+        <div class="main">
+          <div class="content">
+            <div>
+              <table>
+                <tbody id="root">
+                </tbody>            
+              </table>                  
+            </div>                 
+          </div><!-- content -->
+        <div id="console" class="console break-word"></div>    
+        <div id="err" class="err"><a href="https://zebull.in">login zebu first</a>
+            <br/>
+            <br/>
+        </div>
+      </div><!-- main -->
+  </div><!-- wrapper -->
+  <script>
+    window.onload=function() {
+    StartClock();
+  }
+  </script>
+  </body>
+
+  </html>
