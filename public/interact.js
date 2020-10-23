@@ -108,7 +108,7 @@ const _pstPlaceOrder = (trans, sym, tok, qty="1", ordr_typ="MKT", prc="" ) => {
         "complexty": "regular",
         "discqty": "0",
         "exch": "NFO",
-        "pCode": "NRML",
+        "pCode": "MIS",
         "prctyp": ordr_typ,     
         "price": prc,
         "qty": qty,
@@ -233,11 +233,11 @@ const longOnlyTrades = (ul, call, put) => {
                 for(let i = 0; i < tradeData.length; i++) {                            
                     // PUT sell
                     if( tradeData[i].Tsym == pe1 && tradeData[i].Netqty > 0) {
-                        direction = -1;    price = tradeData[i].NetBuyavgprc - trade.stop1;                              
+                        direction = -1;    price = parseInt(tradeData[i].NetBuyavgprc - trade.stop1);                              
                     }
                     // CALL sell
-                    if( tradeData[i].Tsym == ce1 && tradeData[i].Netqty > 0) {
-                        direction = 1;    price = tradeData[i].NetBuyavgprc - trade.stop1;                              
+                    else if( tradeData[i].Tsym == ce1 && tradeData[i].Netqty > 0) {
+                        direction = 1;    price = parseInt(tradeData[i].NetBuyavgprc - trade.stop1);                              
                     }                    
                 }
             }     
@@ -313,9 +313,9 @@ const longOnlyTrades = (ul, call, put) => {
                             _pstModifyOrder (pe1, qty=trade.qty1, ordr_typ="MKT", prc="", isStop);  
                         }       
                         if(sellEntry > open-tgtinpts)
-                        _show_progress (sellEntry, ulData.LTP, open-tgtinpts, open-tgtinpts+trade.stop1,"Entry","Target");                            
+                        _show_progress (sellEntry, ulData.LTP, open-tgtinpts, open-tgtinpts+ parseInt(trade.stop1),"Entry","Target");                            
                         else 
-                        _show_progress (sellEntry, ulData.LTP, open-tgtinpts, open-tgtinpts+trade.stop1,"Entry","Stop");                            
+                        _show_progress (sellEntry, ulData.LTP, open-tgtinpts, open-tgtinpts+parseInt(trade.stop1),"Entry","Stop");                            
                     }              
                                 
                 
