@@ -85,7 +85,7 @@
 
 
     var tgtTimezone = 5.50; //target time zone 
-    var tgtHours    = 17.05;
+    var tgtHours    = 9.23;
 
     var srcClockId, tgtClockId, countDownId
     var d = new Date();  
@@ -100,7 +100,7 @@
     var consol =  document.getElementById('console');
     var tDate = new Date( new Date().getTime() + diffMsOffset ) ;    
     var in_hours   =  timeleft - (tDate.getHours()  * 60)
-    var in_minutes =  in_hours - tDate.getMinutes(); 
+    var in_minutes =  parseInt(in_hours - tDate.getMinutes() );
     var in_secs    =  60 - tDate.getSeconds();
       if (in_secs <10) {
         in_secs = "0"+in_secs;
