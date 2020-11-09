@@ -103,20 +103,28 @@ const _pstModifyOrder = (sym, qty="1", ordr_typ="MKT", prc="", ordr_num ) => {
 };
 
 /* place order */
-const _pstPlaceOrder = (trans, sym, tok, qty="1", ordr_typ="MKT", prc="" ) => {
-    zebu.post('api/placeOrder/executePlaceOrder', [{                 
-        "complexty": "regular",
+const _pstPlaceOrder = (trans, sym, tok, qty="1", ordr_typ="MKT", prc, complexty="regular", tgt="", sl="", tsl="" ) => {
+
+    let trigprc = "0.00";
+    if(ordr_typ==="L") { trigprc = prc }
+    
+
+    zebu.post('api/placeOrder/executePlaceOrder', [{                         
         "discqty": "0",
         "exch": "NFO",
         "pCode": "MIS",
-        "prctyp": ordr_typ,     
-        "price": prc,
+        "prctyp": ordr_typ,             
         "qty": qty,
         "ret": "DAY",
         "symbol_id": tok,        
         "trading_symbol": sym,        
         "transtype": trans,
-        "trigPrice": prc
+        "complexty": complexty,
+        "price": prc,
+        "trigPrice": trigprc,
+        "target": tgt,
+        "stopLoss": sl,
+        "traling_stop_loss":tsl
     }])
         .then(response => {
         const data = response.data;  
@@ -205,6 +213,17 @@ const appendToDOM = (response, who="") => {
 
 /*                      algo part                        */
 /* 5 trade logic */
+
+
+const _pstLtp = (tkn) => {             
+    return zebu.post('api/ScripDetails/getScripQuoteDetails', { "exch": "NFO", "symbol": ulTkn })
+    .then(function(response){
+        return response.data;
+    });    
+}
+      
+
+
 const longOnlyTrades = (ul, call, put) => {             
     
     // console.log("looking to trade for ul ",`${ul}`);      
@@ -242,7 +261,8 @@ const longOnlyTrades = (ul, call, put) => {
                 }
             }     
             
-            // is stop in place. get stop loss                      
+            // is stop in place. get stop loss           
+            /*           
             _orderStatus().then((orders) => {                   
                 if (orders) {                                  
                     noOfOrders = orders.length;                              
@@ -273,7 +293,7 @@ const longOnlyTrades = (ul, call, put) => {
                     
                 }  // orders.stat                 
             });
-            
+            */
 
             ulData = responseArr[1].data;         
             appendToDOM(responseArr[1], "Underlying data");        
@@ -286,6 +306,7 @@ const longOnlyTrades = (ul, call, put) => {
                 const tgtinpts  = parseInt(open * factor * trade.target_ratio);                                          
                 
                 // long call option exit
+                /*
                 if (direction == 1)                     
                     { 
                         if 
@@ -317,12 +338,12 @@ const longOnlyTrades = (ul, call, put) => {
                         else 
                         _show_progress (sellEntry, ulData.LTP, open-tgtinpts, open-tgtinpts+parseInt(trade.stop1),"Entry","Stop");                            
                     }              
-                                
+                  */              
                 
 
                 if ( // entries
-                    (noOfOrders < parseInt(trade.allowed * 2) - 1)
-                    && (direction == 0) 
+                    (noOfOrders < parseInt(trade.allowed * 2) - 1) &&
+                    (direction == 0) 
                 ) {                    
                     console.log("looking to buy @", buyEntry, " and sell @", sellEntry);
                     if (      // long call option entry                   
@@ -330,20 +351,39 @@ const longOnlyTrades = (ul, call, put) => {
                         && ulData.LTP <= (open + entrypts + parseInt(trade.slip)) 
                     ) 
                     { 
-                        _pstPlaceOrder ("BUY", ce1, callTkn, qty=trade.qty1, ordr_typ="MKT"); 
+                        _pstLtp(callTkn).then((scripDetails) => {                   
+                            if (scripDetails) {        
+                                                          
+                                const ltp = scripDetails.LTP;     
+
+                                if (trade.stop1 > ltp) { isStop= ltp-trade.stop1 }
+                                _pstPlaceOrder ("BUY", ce1, callTkn, qty=trade.qty1, ordr_typ="MKT",
+                                                prc=ltp, complexty="bo", tgt= open+tgtinpts, sl=isStop, tsl=tgtinpts); 
+                            }
+                        });                        
                     }
 
                     else if (      // long put option entry                                                             
                          ulData.LTP <= ( open - entrypts) && trade.sellorbuy <=0
                          && ulData.LTP >= ( open - entrypts - parseInt(trade.slip))
-                    ) { 
-                        _pstPlaceOrder ("BUY", pe1, putTkn, qty=trade.qty1, ordr_typ="MKT", prc=""); 
+                    ) 
+                    { 
+                        _pstLtp(callTkn).then((scripDetails) => {                   
+                            if (scripDetails) {        
+                                                          
+                                const ltp = scripDetails.LTP;     
+
+                                if (trade.stop1 > ltp) { isStop= ltp-trade.stop1 }
+                                _pstPlaceOrder ("BUY", pe1, putTkn, qty=trade.qty1, ordr_typ="MKT",
+                                                prc=ltp, complexty="bo", tgt= open+tgtinpts, sl=isStop, tsl=tgtinpts); 
+                            }
+                        });                    
                     }    
                 } // end of entries    
                 else { console.log("no of orders ",noOfOrders, "/ allowed orders ", parseInt(trade.allowed * 2) - 1); }                                               
 
                 if (direction ==0)                     
-                    _show_progress (open, ulData.LTP, buyEntry, sellEntry, "Open","Target");                                                              
+                    _show_progress (open, ulData.LTP, buyEntry, sellEntry, "Open","Entry");                                                              
                 
             }                       
       }) // end of response arr2                      
