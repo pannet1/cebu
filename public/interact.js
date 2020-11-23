@@ -8,7 +8,8 @@ const PE = 'PE';
 const millisecs = 100;
 
 // progress indicator
-const _show_progress = (Start, Ltp, Buy, Sel, lt_txt="Open", rt_txt="Trigger") => {    
+const _show_progress = (Start, Ltp, Buy, Sel, lt_txt="Open", rt_txt="Trigger") => {   
+    /* 
     let width = 0;
     const elem = document.getElementById("bar");
     const root = document.getElementById("root");
@@ -44,6 +45,7 @@ const _show_progress = (Start, Ltp, Buy, Sel, lt_txt="Open", rt_txt="Trigger") =
         "<td>"+Ltp+"</td>"+   
         "<td style='text-align:right'>&nbsp;</td>"+Buy+" / "+Sel+"</tr>";  
     } 
+    */
 };
 
 /* get tokens from scrip json object */
@@ -51,14 +53,8 @@ function _getScripTokens () {
   // convert object to key's array
   const keys = Object.keys(scrips);
   // iterate over object
-  keys.forEach((key, index) => {
-    if (scrips[key] === undefined || scrips[key] === null) {
-    console.log("Token is undefined for ",scrips[key]);
-    }  else {
-    console.log("trying to obtain token from keys of ",scrips)
-    tknFmScrip(scrips[key]);
-    sleep(50);
-    }
+  keys.forEach((key) => {        
+    tknFmScrip(scrips[key]);                   
 });
 };
 
@@ -71,19 +67,22 @@ const _orderStatus = () => {
 }                
 
 /* modify order */      
-const _pstModifyOrder = (sym, qty="1", ordr_typ="MKT", prc="", ordr_num ) => {
-    if (ordr_num == 0) console.log("WARNING: Tried to modify an order with no #")
-    zebu.post('api/placeOrder/modifyOrder', [{                         
-        "discqty": "0",
-        "exch": "NFO",
-        "trading_symbol": sym,           
-        "nestOrderNumber": ordr_num,
+const _pstModifyOrder = (trans, sym, qty="1", ordr_typ="MKT", prc="00.00", ordr_num ) => {
+    
+    direction = 0;
+    zebu.post('api/placeOrder/modifyOrder', {                         
+        "discqty": 0,        
+        "exch": "NFO",        
+        "filledQuantity": 0,        
+        "nestOrderNumber": ordr_num,      
         "prctyp": ordr_typ,     
+        "trading_symbol": sym,         
         "price": prc,
         "qty": qty,
         "trigPrice": prc,
-        "filledQuantity": "0"        
-    }])
+        "transtype": trans,
+        "pCode": "NRML"
+    })
         .then(response => {
         const data = response.data;  
         appendToDOM(response, "modifying order");
@@ -115,7 +114,7 @@ const _pstPlaceBracket = (trans, sym, tok, qty="1", ordr_typ="MKT", prc, complex
     zebu.post('api/placeOrder/executePlaceOrder', [{                         
         "discqty": "0",
         "exch": "NFO",
-        "pCode": "MIS",
+        "pCode": "NRML",
         "prctyp": ordr_typ,             
         "qty": qty,
         "ret": "DAY",
@@ -149,12 +148,13 @@ const _pstPlaceBracket = (trans, sym, tok, qty="1", ordr_typ="MKT", prc, complex
 };
 
 const _pstPlaceOrder = (trans, sym, tok, qty="1", ordr_typ="MKT", prc="" ) => {
-    
+
+    console.log("price is :" + prc);
     zebu.post('api/placeOrder/executePlaceOrder', [{                 
         "complexty": "regular",
         "discqty": "0",
         "exch": "NFO",
-        "pCode": "MIS",
+        "pCode": "NRML",
         "prctyp": ordr_typ,     
         "price": prc,
         "qty": qty,
@@ -198,6 +198,38 @@ const _findITMStrike = (quote,option,strikeDiff=100) => {
             return strike
         }
     }
+}
+
+
+const trailStop = (cmp) => {
+    
+    for (let i=1; i < Object.keys(levels).length; i++) {
+        console.log("levels key is ", levels[i]);
+        if ( direction==1 && cmp < (open + levels[i]) && high > (open+ levels[i+1] ) )
+        {
+            return true
+        }
+
+        if ( direction==-1 && cmp > (open - levels[i]) && low < (open - levels[i+1] ) )
+        {
+            return true
+        }
+
+    }
+    return false;
+    
+}
+
+const drawLvlTable =  (list) => {
+    const root = document.getElementById("root");    
+    root.innerHTML = "";
+    const keysSorted = Object.keys(list).sort(function(a,b){return list[b]-list[a]})
+    for (let i=0; i < Object.keys(list).length; i++) {        
+        root.innerHTML =    root.innerHTML +     
+        "<tr><td style='text-align:right'>"+keysSorted[i]+"</td>"+    
+        "<td style='text-align:left'>"+ parseInt( list[keysSorted[i]] )  +"</td></tr>";                     
+    }
+    
 }
 
 /* helpers */
@@ -273,9 +305,8 @@ const longOnlyTrades = (ul, call, put) => {
     let putTkn     = localStorage.getItem(pe1);                
     
 
-    let direction  = 0;  
-    let isStop     = 0;
-    let price      = 0;    
+    direction  = 0;      
+    let price  = 0;    
     
     axios.all([
         zebu.post('api/positionAndHoldings/positionBook', { "ret":"NET"}),                
@@ -288,18 +319,19 @@ const longOnlyTrades = (ul, call, put) => {
             // are we in any position
             if (tradeData) {                   
                 for(let i = 0; i < tradeData.length; i++) {                            
-                    // PUT sell
+                    // PUT sell                    
                     if( tradeData[i].Tsym == pe1 && tradeData[i].Netqty > 0) {
-                        direction = -1;    price = parseInt(tradeData[i].NetBuyavgprc - trade.stop1);                              
+                        direction = -1;                      
                     }
                     // CALL sell
                     else if( tradeData[i].Tsym == ce1 && tradeData[i].Netqty > 0) {
-                        direction = 1;    price = parseInt(tradeData[i].NetBuyavgprc - trade.stop1);                              
+                        direction = 1;   
                     }                    
                 }
             }     
             
-            // is stop in place. get stop loss                      
+            // is stop in place. get stop loss         
+            
             _orderStatus().then((orders) => {                   
                 if (orders) {                                  
                     noOfOrders = orders.length;                              
@@ -309,7 +341,7 @@ const longOnlyTrades = (ul, call, put) => {
 
                     for(let j = 0; j < noOfOrders; j++) {                                                
                         if( orders[j].Trsym == pe1 && orders[j].Status == "trigger pending") {                            
-                            isStop = parseInt(orders[j].Nstordno)
+                            isStop = parseInt(orders[j].Nstordno)                            
                         }
                         if( orders[j].Trsym == ce1 && orders[j].Status == "trigger pending") {
                             isStop = parseInt(orders[j].Nstordno)
@@ -317,7 +349,6 @@ const longOnlyTrades = (ul, call, put) => {
                     } // end for                                         
                     
                     /*
-                    // place stop orders
                     if (price <= 0) price = 1;
 
                     if (isStop == 0) {
@@ -328,7 +359,6 @@ const longOnlyTrades = (ul, call, put) => {
                         console.log("stop zzz is: ", isStop, "stop price is ", price);     
                     }
                     */
-                    
                 }  // orders.stat                 
             });
             
@@ -337,88 +367,135 @@ const longOnlyTrades = (ul, call, put) => {
             appendToDOM(responseArr[1], "Underlying data");        
             // exits and entry     
             if (ulData.stat = "Ok") {                                
-                open = parseInt(ulData.openPrice);          
+                open = parseInt(ulData.openPrice);     
+                high = parseInt(ulData.High);
+                low = parseInt(ulData.Low);
+
                 const entrypts  = parseInt(open * factor * 0.236);                      
                 const buyEntry  = open + entrypts;
                 const sellEntry = open - entrypts; 
                 const tgtinpts  = parseInt(open * factor * trade.target_ratio);                                          
-                /*
+
+                levels = {
+                    '1': open * factor * 0.236,                 
+                    '2': open * factor * 0.5,                    
+                    '3': open * factor * 0.618,
+                    '4': open * factor * 0.786,                    
+                    '5': open * factor * 1.236,
+                    '6': open * factor * 1.618
+                  };
+
+                  const printable = {
+                      "<< LTP >>": parseInt(ulData.LTP),
+                      "* OPEN_  *":  open,
+                      "+ HIGH_  +": high,
+                      "- _LOW_  -": low,
+                      "+ ENTRY +": open + levels['1'],
+                      "+ TARGT +": open + tgtinpts,
+                      "+ STOP_ +": parseInt(open + entrypts - trade.stop1),
+                      "+ 0.500 +": open + levels['2'],
+                      "+ 0.618 +": open + levels['3'],
+                      "+ 0.786 +": open + levels['4'],                      
+                      "+ 1.236 +": open + levels['5'],                      
+                      "+ MAXIM +": open + levels['6'],
+                      "- STOP_ -": parseInt(open + eval(trade.stop1) - entrypts),
+                      "- ENTRY -": open - levels['1'],
+                      "- TARGT -": open - tgtinpts,
+                      "+ 0.500 +": open - levels['2'],
+                      "- 0.618 -": open - levels['3'],
+                      "- 0.786 -": open - levels['4'],                      
+                      "- 1.236 -": open - levels['5'],                      
+                      "- MAXIM -": open - levels['6']
+                  }
+
+                  drawLvlTable( printable );
+                
                 // long call option exit
-                if (direction == 1)                     
+                if (direction == 1 && isStop > 0)                     
                     { 
                         if 
                         (
-                        ( ulData.LTP > ( open + tgtinpts)) 
-                        // || (  ulData.LTP < ( open - trade.stop1 ))    
-                        ){                            
-                          _pstModifyOrder (ce1, qty=trade.qty1, ordr_typ="MKT", prc=price, isStop);
-                        }
-                        
+                            ( ulData.LTP > parseInt( open + tgtinpts))                              
+                            || trailStop(ulData.LTP)
+                        )
+                        {                           
+                            
+                          _pstModifyOrder ("SELL", ce1, qty=trade.qty1, ordr_typ="MKT", prc="00.00", isStop);                              
+                        }                   
+
                         if(buyEntry < open+tgtinpts )
                         _show_progress (buyEntry, ulData.LTP, open+tgtinpts, open+tgtinpts-trade.stop1, "Entry","Target");                           
                         else
                         _show_progress (buyEntry, ulData.LTP, open+tgtinpts, open-tgtinpts-trade.stop1, "Entry","Stop");                                  
                      }                       
 
+                     
                 // long put option exit
-                if (direction == -1 )
-                    {
+                if (direction == -1 && isStop > 0 )
+                    {        
                         if
                         (
-                        (ulData.LTP < ( open - tgtinpts)) 
-                        // || (ulData.LTP > ( open + trade.stop1 )) 
+                        (ulData.LTP < parseInt( open - tgtinpts))                                   
+                        || trailStop(ulData.LTP)
                         ){ 
-                            _pstModifyOrder (pe1, qty=trade.qty1, ordr_typ="MKT", prc="", isStop);  
-                        }       
+                           
+                            _pstModifyOrder ("SELL", pe1, qty=trade.qty1, ordr_typ="MKT", prc="00.00", isStop);                              
+                        }                               
+
                         if(sellEntry > open-tgtinpts)
                         _show_progress (sellEntry, ulData.LTP, open-tgtinpts, open-tgtinpts+ parseInt(trade.stop1),"Entry","Target");                            
                         else 
                         _show_progress (sellEntry, ulData.LTP, open-tgtinpts, open-tgtinpts+parseInt(trade.stop1),"Entry","Stop");                            
                     }              
-                */                
+                
                 
                
                
                 if ( // entries
-                    (noOfOrders < trade.allowed)
+                    (noOfOrders < parseInt(trade.allowed * 2) - 1)                   
                     && (direction == 0) 
                 ) {                    
-                    console.log("looking to buy @", buyEntry, " and sell @", sellEntry);
+                    
+
                     if (      // long call option entry                   
                         ulData.LTP >= (open + entrypts) && trade.sellorbuy >=0
-                      //  && ulData.LTP <= (open + entrypts + parseInt(trade.slip)) 
+                       && ulData.LTP <= (open + entrypts + parseInt(trade.slip)) 
+                       && (high < open+levels[2])
                     ) 
                     { 
                         _pstLtp(callTkn).then((scripDetails) => {                   
                             if (scripDetails) {                                                                 
-                                const ltp = scripDetails.LTP;     
-                                isStop= trade.stop1
-                                _pstPlaceBracket ("BUY", ce1, callTkn, qty=trade.qty1, ordr_typ="L",
-                                                prc=ltp, complexty="bo", tgt=tgtinpts, sl=isStop, tsl=tgtinpts); 
+                                const ltp = scripDetails.LTP;                                     
+                                if(ltp>trade.stop1) price = parseInt(ltp-trade.stop1);                                
+                                _pstPlaceOrder("BUY", ce1, callTkn, qty=trade.qty1, ordr_typ="MKT", prc="" );                                
+                                _pstPlaceOrder ("SELL", ce1, callTkn, qty=trade.qty1, ordr_typ="SL-M", prc=price);                                
                             }
-                        });       
+                        });             
+                        index();                  
                     }
 
                     else if (      // long put option entry                                                             
                          ulData.LTP <= ( open - entrypts) && trade.sellorbuy <=0
-                         // && ulData.LTP >= ( open - entrypts - parseInt(trade.slip))
+                         && ulData.LTP >= ( open - entrypts - parseInt(trade.slip))
+                         && (low > open-levels[2])
                     ) { 
                         
                         _pstLtp(putTkn).then((scripDetails) => {                   
                             if (scripDetails) {                                                                 
                                 const ltp = scripDetails.LTP;     
-                                isStop= trade.stop1;
-                                
-                                _pstPlaceBracket ("BUY", pe1, putTkn, qty=trade.qty1, ordr_typ="L",
-                                                prc=ltp, complexty="bo", tgt=tgtinpts, sl=isStop, tsl=tgtinpts); 
+                                if(ltp>trade.stop1) price = parseInt(ltp-trade.stop1)                                 
+                                _pstPlaceOrder ("BUY", pe1, putTkn, qty=trade.qty1, ordr_typ="MKT", prc="")
+                                _pstPlaceOrder ("SELL", pe1, putTkn, qty=trade.qty1, ordr_typ="SL-M", prc=price);                                                
                             }
                         });  
+                        index();
                     }    
                 } // end of entries    
                 else { console.log("no of orders ",noOfOrders, "/ allowed orders ", trade.allowed) }                                               
 
                 if (direction ==0)                     
-                    _show_progress (open, ulData.LTP, buyEntry, sellEntry, "Open","Entry");                                                              
+                    _show_progress (open, ulData.LTP, buyEntry, sellEntry, "Open","Entry");                     
+                
                 
             }                       
       }) // end of response arr2                      
@@ -438,17 +515,29 @@ function longScripsFromUl(ul, ulTkn) {
              ulData = resp.data;                                
                 if (ulData.stat == "Ok") {                                    
                     const open = parseInt(ulData.openPrice);                    
-                    const factinpts = open * factor * 0.236;                                        
-                    createCookie(ul, factinpts, 0);                                        
+                    const factinpts = open * factor * 0.236;                                                                            
+
+                    const sellstrike = _findITMStrike(open-factinpts,PE);
+                    const pe1 = trade.base1 + trade.week + sellstrike + "PE";
+                    createCookie("pe1",pe1,0)                                        
+                    // tknFmScrip(pe1);
+
                     const longstrike = _findITMStrike(open+factinpts,CE);
-                    createCookie("ce1", trade.base1 + trade.week + longstrike  + CE, 0);                                                            
-                    const sellstrike = _findITMStrike(open-factinpts,PE)
-                    scrips = {
-                    "ce1": trade.base1 + trade.week + longstrike  + CE,
-                    "pe1": trade.base1 + trade.week + sellstrike + PE
-                    };                            
-                    createCookie("pe1",trade.base1 + trade.week + sellstrike + PE,0)
-                    _getScripTokens();                      
+                    const ce1 = trade.base1 + trade.week + longstrike  + "CE";
+                    createCookie("ce1", ce1, 0);                                                                                                    
+                    // tknFmScrip(ce1);                                      
+                    
+                    scrips = {                       
+                        "pe1": pe1,
+                        "ce1": ce1
+                        };       
+
+                    _getScripTokens();                                      
+                    
+                    if(localStorage.getItem(pe1)!=null && localStorage.getItem(ce1)!=null)
+                    {                    
+                    createCookie(ul, factinpts, 0);          
+                    }                     
                 } 
             })
             .catch(function (error) {
@@ -462,6 +551,7 @@ function longScripsFromUl(ul, ulTkn) {
 
 /* 3 get token from scrip name */
 const tknFmScrip = (scrip) => {             
+        console.log("getting token for scrip",scrip);
         zebu.post('exchange/getScripForSearch', {        
             "symbol":scrip,
             "exchange":["NFO"]
@@ -469,7 +559,7 @@ const tknFmScrip = (scrip) => {
             .then(response => {         
                 const data = response.data;
                 appendToDOM(response, "Getting token");    
-                console.log(data);                                                                                       
+                //console.log(data);                                                                                       
                 for(var k = 0; k < data.length; k++) {                   
                     if(data[k].instrument_name == scrip) {
                     localStorage.setItem(scrip, data[k].token);  
@@ -529,29 +619,31 @@ function index() {
         if(ulTkn == null  ) {
             console.log("first attempt to get token for ul ", ul1 );          
             tknFmScrip(ul1);                  
-        }  else if(cookieUl1 == null)
-        {         
+        }  
+         if(cookieUl1 == null)
+         {         
         // 4. get long options scrip name from underlying                       
             longScripsFromUl(ul1, ulTkn);                                            
-            console.log("building long scrip list for ul "+ ul1+ " with token "+ ulTkn )  
+            
         }         
 
         // 5. take trades with instruments
         if ( cookieUl1 != null && ulTkn != null) {                                   
-            ce1 = readCookie("ce1"); 
-            pe1 = readCookie("pe1");
+            const ce1 = readCookie("ce1"); 
+            const pe1 = readCookie("pe1");
 
             if(ce1!=null && pe1!=null) { longOnlyTrades('ul1', 'ce1', 'pe1');  }          
-        } else {
-            console.log("cookie ul is "+cookieUl1+" and ulTkn is "+ulTkn);
-            _redirect("/",500);
-        }              
+            } else {
+            console.log("cookie ul1 is "+cookieUl1+" and ulTkn is "+ulTkn);
+            // _redirect("/",500);
+            }              
 
     });  // end of get settings
-
+    
     sleep(5000).then( () => {
         index();
-    })         
+    })
+    
   
 }
 /** ------------------------ end of bootstrap ------------------------- */
@@ -590,8 +682,7 @@ const pstPositions = () => {
               console.log(error.response.status);              
             }
     });
-    root.innerHTML += "resuming";
-    _redirect("/",5000);                
+            
 };
 
 // orders 
@@ -627,7 +718,5 @@ const getOrders = () => {
               console.log(error.response.data);
               console.log(error.response.status);              
             }
-    })            
-    root.innerHTML += "resuming";
-    _redirect("/",5000);  
+    })                
 };

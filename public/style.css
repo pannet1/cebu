@@ -143,6 +143,11 @@ a {
   hyphens: auto;
 
 }
+/*
+td {
+  border:solid 1px black;
+}
+*/
 
 .rt {
  float: right;
