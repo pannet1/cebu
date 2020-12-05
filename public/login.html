@@ -12,7 +12,7 @@
     <script>
     const userId = "TE185A01";
     const apikey = "3dcNgLL4geEpRYqpgCTAlcZEU8ihcHjfW69sQ2aq1ma4Juu7CCs7m7dsha83VrdFI5Q9HMZzZSgQzPLebEnS1beEr8I3zCn3Q1WQrhCNEE0Y4HAvfI2ULpfXmW0Vdf3d";
-    
+    // 3. get session
     const _getSessionId = (enckey) => {
     var plainText = userId + apikey + enckey;
     $("#root").append("plainText: " + plainText + "<br>");
@@ -34,7 +34,7 @@
         if (data.stat == "Ok") {
           var sid = data.sessionID;
           $("#root").append("sid: " + sid+ "<br>");
-          createCookie('sid',sid,0);              
+          createCookie('sid', sid,0);              
           location.href = "/index.html";  
         }
         var emsg = data.emsg;
@@ -44,7 +44,7 @@
       error: function(errorThrown) {}
     });
   }
-
+ //2. get key
   const _getZebuKey = () => {                         
     var jsonObj = {
       "userId": userId
@@ -57,7 +57,7 @@
       type: 'post',
       success: function(data) {
         var enckey = data.encKey;
-        $("#root").append("enkey: " + enckey + "<br>");
+        $("#root").append("enckey: " + enckey + "<br>");
         _getSessionId(enckey);
         var emsg = data.emsg;
         $("#msg").append(emsg);
@@ -65,7 +65,7 @@
       error: function(errorThrown) {}
     });
   }
-    
+  // 1. bootstrap   
   const index = () => {
     $.ajax({
     url: "/factor",

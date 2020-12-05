@@ -1,4 +1,4 @@
- const fs = require('fs');
+const fs = require('fs');
 const url = require('url');
 const express = require('express');
 const compression = require('compression');
