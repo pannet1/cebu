@@ -198,7 +198,7 @@ const _findITMStrike = (quote,option,strikeDiff=100) => {
 const trailStop = (cmp) => {
     
     for (let i=1; i < Object.keys(levels).length; i++) {
-        console.log("levels key is ", levels[i]);
+        
         if ( direction==1 
             && cmp < parseInt(open + levels[i]) 
             && high > parseInt(open+ levels[i+1]) 
@@ -233,7 +233,7 @@ const drawLvlTable =  (list) => {
 
 
 const isTradeTime = (s, end="15:25:00", beg="09:15:00") => {
-  
+
   cDate = new Date(s);
   cTime = cDate.getTime();
 
@@ -243,7 +243,7 @@ const isTradeTime = (s, end="15:25:00", beg="09:15:00") => {
 
   endDate = new Date(t[0] + " " + end);
   endTime = endDate.getTime(); 
-  
+  console.log("CTime",CTime,"endTime",endTime);
   if (cTime>=begTime && cTime<=endTime) {
     return true
   } else {
@@ -321,7 +321,7 @@ const longOnlyTrades  = (ul1, ce1, pe1) => {
     let peTkn  = localStorage.getItem(pe1);                
     
     direction  = 0;      
-    isStop = 0;
+    // isStop = 0;
     price  = 1;    
     
     axios.all([
@@ -360,7 +360,7 @@ const longOnlyTrades  = (ul1, ce1, pe1) => {
                             isStop = parseInt(orders[j].Nstordno)                            
                         }
                         if( orders[j].Trsym == ce1 && orders[j].Status == "trigger pending") {
-                            isStop = parseInt(orders[j].Nstordno)
+                            isStop = parseInt(orders[j].Nstordno)                            
                         }                                            
                     } // end for                                                             
                 
@@ -411,10 +411,10 @@ const longOnlyTrades  = (ul1, ce1, pe1) => {
                   }
 
                   drawLvlTable( printable );
-                
+                  
                 // long call option exit
                 if (direction == 1 && isStop > 0)                     
-                    { 
+                    {                         
                         if 
                         (
                             ( ulData.LTP > parseInt( open + tgtinpts))                              
@@ -491,7 +491,9 @@ const longOnlyTrades  = (ul1, ce1, pe1) => {
                                     
                     }    
                 } // end of entries    
-                else { console.log("no of orders ",noOfOrders," >= allowed orders ", (trade.allowed * 2) - 1) }                                               
+                else if (direction==0) { 
+                    console.log("no of orders ",(noOfOrders/2)," > allowed orders ",trade.allowed) 
+                }                                               
 
                 if (direction ==0)  
                     _show_progress (open, ulData.LTP,  open + levels['1'], open - levels['1'], "Open","Entry");                                     
