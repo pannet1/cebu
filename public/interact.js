@@ -2,12 +2,24 @@
 const millisecs = 100;
 
 // progress indicator
-const _show_progress = (Txn=1, Start, Ltp, Tgt, Stop) => {   
-    
-    let width = 0; let rt_txt="Target";    
+const _show_progress = (Txn, Start, Ltp, Tgt, Stop) => {      
+
+    let width = 0, rt_txt="Target", lt_txt="Open";
     const elem = document.getElementById("bar");
-    const root = document.getElementById("root");
-    
+    const ptxt = document.getElementById("ptxt");
+
+    if( Txn==0) {
+        if (Ltp>Start && Ltp<Tgt ) {
+            rt_txt = "Long";
+            width = (-1*(Start-Ltp)) / (-1*(Start-Tgt)) * 100;
+            elem.classList.add("green");
+        } else if (Ltp<Start && Ltp>Stop)
+        {            
+            rt_txt = "Short"
+            width = (Start-Ltp) / (Start-Stop) * 100;                        
+            elem.classList.add("red");
+        }
+    }  else { lt_txt="Entry" } 
     // long
     if( Txn==1 ) {
         if (Ltp<Start) {
@@ -15,23 +27,27 @@ const _show_progress = (Txn=1, Start, Ltp, Tgt, Stop) => {
             width = (Start-Ltp) / (Start-Stop) * 100;
             elem.classList.add("red");              
         } else {            
-            width = -1*(Start-Ltp) / -1*(Start-Tgt) * 100;
+            rt_txt = "Target";     
+            width = (-1*(Start-Ltp)) / (-1*(Start-Tgt)) * 100;
+            elem.classList.add("green");
         }        
-    }        
-    
+    }  
     // short
     if (Txn==-1) {
         if(Ltp>Start) {
-        rt_txt = "Stop";     
-        width = -1*(Start-Ltp) / -1*(Start-Stop) * 100;
+            rt_txt = "Stop";     
+            width = (-1*(Start-Ltp)) / (-1*(Start-Stop)) * 100;
+            elem.classList.add("red");           
         } else {
-        width = (Start-Ltp) / (Start-Tgt) * 100;
-        elem.classList.add("green");            
+            rt_txt = "Target";     
+            width = (Start-Ltp) / (Start-Tgt) * 100;
+            elem.classList.add("green");            
         }
     }
 
     elem.style.width = width + "%";        
-    root.innerHTML = "<tr><th style='text-align:left'>Entry</td>"+
+    ptxt.innerHTML = 
+                    "<tr><th style='text-align:left'>"+lt_txt+"</td>"+
                     "<th>LTP</td>"+   
                     "<th style='text-align:right'>"+rt_txt+"</td></tr>";                    
     
@@ -190,20 +206,11 @@ const _findITMStrike = (quote,option,strikeDiff=100) => {
 }
 
 const trail50 = (cmp, lng, srt) => {
-        if ( direction==1 
-            && cmp < lng           
-            )
-            {
-                console.log("cmp is "+cmp+" < lng is", lng);
-                return true;
-            }
-        else if ( direction==-1 
-            && cmp > srt            
-            )
-            {
-                console.log("cmp is "+ cmp +" > srt is", srt);
-                return true;
-            }
+    console.log("cmp is "+cmp+" < lng is", lng+" > srt is", srt);    
+        if ( direction==1 && cmp < lng )            
+                return true;            
+        else if ( direction==-1 && cmp > srt )           
+                return true;            
         else     
             return false;
 }
@@ -221,6 +228,7 @@ const trailStop = (cmp) => {
             console.log("cmp is "+cmp+" high is", high)
             return true
         }
+        
         if ( direction==-1 && cmp > (open - levels[i]) && low < (open - levels[i+1] ) )
         {
             console.log("cmp is "+ cmp +" low is", low)
@@ -422,14 +430,14 @@ const longOnlyTrades  = (ul1, ce1, pe1) => {
                 // long call option exit
                 if (direction == 1 && isStop > 0)                     
                     {                       
-                        _show_progress ( direction, printable['+ ENTRY +'], ulData.LTP, printable['+ TARGT +'], printable['+ STOP_ +'] );                           
+                     _show_progress ( direction, printable['+ ENTRY +'], ulData.LTP, printable['+ TARGT +'], printable['+ STOP_ +'] );                           
                         
                         if  
                         (                          
                           ulData.LTP > eval(open + levels['2'])            
                         )    
-                        {                            
-                         _show_progress ( direction, printable['+ ENTRY +'], ulData.LTP, printable['+ TARGT +'], lngtrail );                           
+                        {                        
+                           
                            if ( trail50(ulData.LTP, lngtrail, srttrail) )
                            { 
                                _pstModifyOrder ("SELL", ce1, qty=trade.qty1, ordr_typ="MKT", prc="00.00", isStop, trade.validity);
@@ -439,42 +447,35 @@ const longOnlyTrades  = (ul1, ce1, pe1) => {
                         if 
                         (
                             ( ulData.LTP > parseInt( open + tgtinpts))                                              
-                            || !IsTradeTime(ulData.exchFeedTime, trade.squareoff)                                         
+                            || !IsTradeTime(ulData.exchFeedTime, trade.squareoff)    
+                            || ulData.LTP < ( open - trade.stop1)                                     
                         )
                         {                               
                           _pstModifyOrder ("SELL", ce1, qty=trade.qty1, ordr_typ="MKT", prc="00.00", isStop, trade.validity);                                                        
                         }                     
                         
-                     }          
-
-                     
+                     }                              
                      
                 // long put option exit
                 if (direction == -1 && isStop > 0 )
                     {                      
-                        show_progress ( direction, printable['+ ENTRY +'], ulData.LTP, printable['+ TARGT +'], printable['+ STOP_ +'] );                           
+                       _show_progress ( direction, printable['+ ENTRY +'], ulData.LTP, printable['+ TARGT +'], printable['+ STOP_ +'] );                           
                         
                         if
                         (
                         (ulData.LTP < parseInt( open - tgtinpts))                         
                         || !IsTradeTime(ulData.exchFeedTime, trade.squareoff)
+                        || ulData.LTP > (open + trade.stop1)
                         )
                         {                            
                             _pstModifyOrder ("SELL", pe1, qty=trade.qty1, ordr_typ="MKT", prc="00.00", isStop, trade.validity);                                                        
                         }                                                                                          
                         else if (ulData.LTP < eval(open - levels['2']) )
-                        {    
-                                                   
+                        {                               
                             if( trail50(ulData.LTP, lngtrail, srttrail) ) {
                                 _pstModifyOrder ("SELL", pe1, qty=trade.qty1, ordr_typ="MKT", prc="00.00", isStop, trade.validity);                                                        
                             }
-                        }                                           
-                        
-
-                        if(open - levels['1'] > open-tgtinpts)
-                        _show_progress (open - levels['1'], ulData.LTP, open-tgtinpts, open-tgtinpts+ parseInt(trade.stop1),"Entry","Target");                            
-                        else 
-                        _show_progress (open - levels['1'], ulData.LTP, open-tgtinpts, open-tgtinpts+parseInt(trade.stop1),"Entry","Stop");                            
+                        }                                                                   
                     }                           
                
                
@@ -482,12 +483,15 @@ const longOnlyTrades  = (ul1, ce1, pe1) => {
                     (noOfOrders < parseInt(trade.allowed * 2) - 1)                   
                     && (direction == 0) 
                 ) {                    
+                    _show_progress ( direction, open, ulData.LTP, printable['+ ENTRY +'], printable['- ENTRY -'] );           
+                    
+
                     if (      // long call option entry                   
                         ulData.LTP >= (open + levels['1']) && trade.sellorbuy >=0
                         && ulData.LTP <= (open + levels['1'] + parseInt(trade.slip)) 
                         && (high < open+levels['2'])
                     ) 
-                    {                          
+                    {    direction = 1;
                         _pstLtp(ceTkn).then((scripDetails) => {                   
                             if (scripDetails) {                                                                 
                                 const ltp = parseFloat(scripDetails.LTP) ;                                     
@@ -496,15 +500,14 @@ const longOnlyTrades  = (ul1, ce1, pe1) => {
                                 _pstPlaceOrder("BUY", ce1, ceTkn, qty=trade.qty1, ordr_typ="MKT", prc="", trade.validity);                                
                                 _pstPlaceOrder ("SELL", ce1, ceTkn, qty=trade.qty1, ordr_typ="SL-M", prc=price,trade.validity);                                  
                             }
-                            index();                              
+                            longOnlyTrades(ul1, ce1, pe1);                             
                         });                                     
                     }
-
                     else if (      // long put option entry                                                             
                          ulData.LTP <= ( open - levels['1']) && trade.sellorbuy <=0
                          && ulData.LTP >= ( open - levels['1'] - parseInt(trade.slip))
                          && (low > open-levels['2'])
-                    ) {                         
+                    ) {  direction = -1;                       
                         _pstLtp(peTkn).then((scripDetails) => {                   
                             if (scripDetails) {                                                                 
                                 const ltp = parseFloat(scripDetails.LTP);                                     
@@ -512,17 +515,14 @@ const longOnlyTrades  = (ul1, ce1, pe1) => {
                                 _pstPlaceOrder ("BUY", pe1, peTkn, qty=trade.qty1, ordr_typ="MKT", prc="" ,trade.validity);                                
                                 _pstPlaceOrder ("SELL", pe1, peTkn, qty=trade.qty1, ordr_typ="SL-M", prc=price,trade.validity);                                                                                                               
                             }
-                            index();
+                            longOnlyTrades(ul1, ce1, pe1);
                         });  
                                     
                     }    
                 } // end of entries    
                 else { 
                     console.log("no of orders ",(noOfOrders/2)," > allowed orders ",trade.allowed) 
-                }                                               
-
-                if (direction ==0)  
-                    _show_progress (open, ulData.LTP,  open + levels['1'], open - levels['1'], "Open","Entry");                                     
+                }                                                
                                        
             }                       
       }) // end of response arr2                      
@@ -533,7 +533,7 @@ const longOnlyTrades  = (ul1, ce1, pe1) => {
         }
         });                 
 
-        sleep(6500).then( () => {                 
+        sleep(6100).then( () => {                 
             longOnlyTrades(ul1, ce1, pe1);
         })
 }
