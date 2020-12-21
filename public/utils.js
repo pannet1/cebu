@@ -115,3 +115,14 @@ const _pstMwScrips = (logindefaultmw) => {
             }
           });            
 }
+
+/* get tokens from scrip json object */
+function _getScripTokens () {           
+    // convert object to key's array
+    const keys = Object.keys(scrips);
+    // iterate over object
+    keys.forEach((key) => {        
+      tknFmScrip(scrips[key]);                   
+  });
+  };
+  
