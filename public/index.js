@@ -190,12 +190,14 @@ const _findITMStrike = (quote,option,strikeDiff=100) => {
 }
 
 const trail50 = (cmp, lng, srt) => {
-    console.log("cmp is "+cmp+" < lng is", lng+" > srt is", srt);    
-        if ( direction==1 && cmp < lng )            
+    // console.log("cmp is "+cmp+" < lng:", lng, srt==0 && cmp < lng );    
+    // console.log("cmp is "+cmp+" > srt:", lng, lng==0 && cmp > srt );           
+        if ( srt==0 && cmp < lng )                    
                 return true;            
-        else if ( direction==-1 && cmp > srt )           
-                return true;            
-        else     
+        else if ( lng==0 && cmp > srt )           
+                return true;          
+        else
+            console.log("trailing condition is false");
             return false;
 }
 
@@ -310,7 +312,9 @@ async function longOnlyTrades  (ul1, ce1, pe1)  {
     let ulTkn  = localStorage.getItem(ul1);    
     let ceTkn  = localStorage.getItem(ce1);
     let peTkn  = localStorage.getItem(pe1);                   
-    let direction,noOfOrders, stopOrderNo  = 0;        
+    let direction = 0;
+    let noOfOrders = 0;
+    let stopOrderNo  = 0;        
     // TODO convert price to let statement
     price      = 1;    
     
@@ -384,13 +388,14 @@ async function longOnlyTrades  (ul1, ce1, pe1)  {
             
             // is stop in place
             if (stopOrderNo > 0) {
+            
                 if (direction == 1)                     
                 {                       
                     _show_progress ( direction, printable['+ ENTRY +'], ulData.LTP, printable['+ TARGT +'], printable['+ STOP_ +'] );                                               
                     // trail condition      
                     if(ulData.LTP > eval(open + levels['2']))    
                     {                                                
-                        if ( trail50(ulData.LTP, lngtrail, srttrail) )                     
+                        if ( trail50(ulData.LTP, lngtrail, 0) )                     
                         _pstModifyOrder ("SELL", ce1, qty=trade.qty1, ordr_typ="MKT", prc="00.00", stopOrderNo, trade.validity);                               
                     }
                     else if // exit
@@ -407,7 +412,7 @@ async function longOnlyTrades  (ul1, ce1, pe1)  {
                     // trail condition    
                     if (ulData.LTP < eval(open - levels['2']) )
                     {                               
-                        if( trail50(ulData.LTP, lngtrail, srttrail) ) 
+                        if( trail50(ulData.LTP, 0, srttrail) ) 
                         _pstModifyOrder ("SELL", pe1, qty=trade.qty1, ordr_typ="MKT", prc="00.00", stopOrderNo, trade.validity);                                                                            
                     } else if // exit
                     (
@@ -417,12 +422,13 @@ async function longOnlyTrades  (ul1, ce1, pe1)  {
                     )                                         
                         _pstModifyOrder ("SELL", pe1, qty=trade.qty1, ordr_typ="MKT", prc="00.00", stopOrderNo, trade.validity);                                                        
                 }
-            }  // is  stop in place                                             
+            }  // end of is  stop in place                                             
             
             if ( // entries
                 (noOfOrders < parseInt(trade.allowed * 2) - 1)                   
                 && (direction == 0) 
-            ) {                    
+            ) {                          
+                          
                 _show_progress ( direction, open, ulData.LTP, printable['+ ENTRY +'], printable['- ENTRY -'] ); 
                 if (      // long call option entry                   
                     ulData.LTP >= (open + levels['1']) && trade.sellorbuy >=0
@@ -450,8 +456,10 @@ async function longOnlyTrades  (ul1, ce1, pe1)  {
                     });                                  
                 }    
             } // end of entries    
-            else { 
-                console.log("no of orders ",(noOfOrders/2)," > allowed orders ",trade.allowed) 
+            else if (direction==0){ 
+                
+                console.log("no of orders ",noOfOrders," < trades",(trade.allowed*2)-1,": ", noOfOrders < (trade.allowed*2)-1) 
+                
             }                                 
                                     
         }                       
@@ -463,7 +471,7 @@ async function longOnlyTrades  (ul1, ce1, pe1)  {
         }
         });      
     
-    sleep(6000).then( () => {                 
+    sleep(5000).then( () => {                 
       longOnlyTrades(ul1, ce1, pe1);
     })
 }
@@ -487,15 +495,7 @@ function longScripsFromUl(ul, ulTkn) {
                     const longstrike = _findITMStrike(open+factinpts,"CE");
                     const ce1 = trade.base1 + trade.week + longstrike  + "CE";
                     createCookie("ce1", ce1, 0);                                                                                                    
-                    tknFmScrip(ce1);                                      
-                    
-                    /* scrips = {                       
-                        "pe1": pe1,
-                        "ce1": ce1
-                        };       
-
-                    _getScripTokens();
-                    */                                     
+                    tknFmScrip(ce1);                                                                      
                     
                     if(localStorage.getItem(pe1)!=null && localStorage.getItem(ce1)!=null)
                     {                    

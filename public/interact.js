@@ -322,14 +322,14 @@ const appendToDOM = (response, who="") => {
 
 
 
-const _pstLtp = (tkn) => {             
+function _pstLtp (tkn) {             
     return zebu.post('api/ScripDetails/getScripQuoteDetails', { "exch": "NFO", "symbol": tkn })
     .then(function(response){
         return response;
     });    
 }
 
-const longOnlyTrades  = (ul1, ce1, pe1) => {                 
+ function longOnlyTrades (ul1, ce1, pe1) {                 
     
     let ulTkn  = localStorage.getItem(ul1);    
     let ceTkn  = localStorage.getItem(ce1);
@@ -373,8 +373,8 @@ const longOnlyTrades  = (ul1, ce1, pe1) => {
                 });                
             
             // exits and entry     
-            const ulData = responseArr[1].data;         
-            //appendToDOM(responseArr[1], "Checking Underlying");
+            ulData = responseArr[1].data;         
+            appendToDOM(responseArr[1], "Checking Underlying");
             if (ulData.stat == "Ok") {                                
                 open = parseInt(ulData.openPrice);     
                 high = parseInt(ulData.High);
@@ -464,10 +464,13 @@ const longOnlyTrades  = (ul1, ce1, pe1) => {
                     }  
                 }                                          
                
+                
                 if ( // entries
                     (noOfOrders < parseInt(trade.allowed * 2) - 1)                   
                     && (direction == 0) 
                 ) {                    
+                    console.log(ulData.LTP <= ( open - levels['1']) && trade.sellorbuy <=0);
+                    console.log(ulData.LTP >= (open + levels['1']) && trade.sellorbuy >=0)
                     _show_progress ( direction, open, ulData.LTP, printable['+ ENTRY +'], printable['- ENTRY -'] ); 
                     if (      // long call option entry                   
                         ulData.LTP >= (open + levels['1']) && trade.sellorbuy >=0
@@ -475,7 +478,7 @@ const longOnlyTrades  = (ul1, ce1, pe1) => {
                         && (high < open+levels['2'])
                     ) 
                     {                           
-                        _pstLtp(ceTkn).then((resp) => {                   
+                       _pstLtp(ceTkn).then((resp) => {                   
                                 appendToDOM(resp, "long entry and stop");
                                 const scripDetails = resp.data;
                                 const ltp = parseFloat(scripDetails.LTP);                                     
@@ -490,7 +493,7 @@ const longOnlyTrades  = (ul1, ce1, pe1) => {
                          && ulData.LTP >= ( open - levels['1'] - parseInt(trade.slip))
                          && (low > open-levels['2'])
                     ) {                         
-                        _pstLtp(peTkn).then((resp) => {                   
+                         _pstLtp(peTkn).then((resp) => {                   
                                 appendToDOM(resp, "short entry and stop");
                                 const scripDetails = resp.data
                                 const ltp = parseFloat(scripDetails.LTP);                                     
