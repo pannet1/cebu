@@ -1,4 +1,4 @@
-/* private functions */
+// constants
 const millisecs = 100;
 
 // progress indicator
@@ -56,14 +56,27 @@ const _show_progress = (Txn, Start, Ltp, Tgt, Stop) => {
 /* order status */
 const _orderStatus = () => {    
     return zebu.get('api/placeOrder/fetchOrderBook')
-    .then(function(response){
-        return response;
-    });    
-}                
+    .then(function(resp){
+        appendToDOM(resp, "order status");     
+          const orders = resp.data;  
+           let stopOrderNo = 0;                                                
+           let noOfOrders = orders.length;                              
+            if (noOfOrders === null || typeof noOfOrders === 'undefined')                         
+                noOfOrders = 0  
+            for(let j = 0; j < noOfOrders; j++) {                                                
+                if( orders[j].Trsym == pe1 && orders[j].Status == "trigger pending") {                            
+                    stopOrderNo = parseInt(orders[j].Nstordno)                            
+                }
+                if( orders[j].Trsym == ce1 && orders[j].Status == "trigger pending") {
+                    stopOrderNo = parseInt(orders[j].Nstordno)                            
+                }                                            
+            } // end for
+            return stopOrderNo;
+        });   
+    }     
 
 /* modify order */      
-const _pstModifyOrder = (trans, sym, qty="1", ordr_typ="MKT", prc="00.00", ordr_num, validity ) => {
-    
+const _pstModifyOrder = (trans, sym, qty="1", ordr_typ="MKT", prc="00.00", ordr_num, validity ) => {    
     direction = 0;
     zebu.post('api/placeOrder/modifyOrder', {                         
         "discqty": 0,        
@@ -98,14 +111,9 @@ const _pstModifyOrder = (trans, sym, qty="1", ordr_typ="MKT", prc="00.00", ordr_
 };
 
 /* place order */
-
-
 const _pstPlaceBracket = (trans, sym, tok, qty="1", ordr_typ="MKT", prc, complexty="regular", tgt="", sl="", tsl="" ) => {
-
     let trigprc = "0.00";
     if(ordr_typ!="MKT") { trigprc = prc }
-    
-
     zebu.post('api/placeOrder/executePlaceOrder', [{                         
         "discqty": "0",
         "exch": "NFO",
@@ -142,8 +150,7 @@ const _pstPlaceBracket = (trans, sym, tok, qty="1", ordr_typ="MKT", prc, complex
     })            
 };
 
-const _pstPlaceOrder = (trans, sym, tok, qty="1", ordr_typ="MKT", prc="", validity ) => {
-
+const _pstPlaceOrder = (trans, sym, tok, qty="1", ordr_typ="MKT", prc, validity ) => {
     console.log("price is :" + prc);
     zebu.post('api/placeOrder/executePlaceOrder', [{                 
         "complexty": "regular",
@@ -196,45 +203,24 @@ const _findITMStrike = (quote,option,strikeDiff=100) => {
 }
 
 const trail50 = (cmp, lng, srt) => {
-    console.log("cmp is "+cmp+" < lng is", lng+" > srt is", srt);    
-        if ( direction==1 && cmp < lng )            
+    // console.log("cmp is "+cmp+" < lng:", lng, srt==0 && cmp < lng );    
+    // console.log("cmp is "+cmp+" > srt:", lng, lng==0 && cmp > srt );           
+        if ( srt==0 && cmp < lng )                    
                 return true;            
-        else if ( direction==-1 && cmp > srt )           
-                return true;            
-        else     
+        else if ( lng==0 && cmp > srt )           
+                return true;          
+        else
+            console.log("trailing condition is false");
             return false;
 }
 
-// not used 
-const trailStop = (cmp) => {
-    
-    for (let i=1; i < Object.keys(levels).length; i++) {
-        
-        if ( direction==1 
-            && cmp < parseInt(open + levels[i]) 
-            && high > parseInt(open+ levels[i+1]) 
-            )
-        {
-            console.log("cmp is "+cmp+" high is", high)
-            return true
-        }
-        
-        if ( direction==-1 && cmp > (open - levels[i]) && low < (open - levels[i+1] ) )
-        {
-            console.log("cmp is "+ cmp +" low is", low)
-            return true
-        }
-    }
-    return false;
-    
-}
 
 const drawLvlTable =  (list) => {
     const root = document.getElementById("root");    
     root.innerHTML = "";
     const keysSorted = Object.keys(list).sort(function(a,b){return list[b]-list[a]})
     for (let i=0; i < Object.keys(list).length; i++) {        
-        root.innerHTML =    root.innerHTML +     
+        root.innerHTML = root.innerHTML +     
         "<tr><td style='text-align:right'>"+keysSorted[i]+"</td>"+    
         "<td style='text-align:left'>"+ parseInt( list[keysSorted[i]] )  +"</td></tr>";                     
     }
@@ -320,207 +306,160 @@ const appendToDOM = (response, who="") => {
 /*                      algo part                        */
 /* 5 trade logic */
 
-
-
-function _pstLtp (tkn) {             
-    return zebu.post('api/ScripDetails/getScripQuoteDetails', { "exch": "NFO", "symbol": tkn })
-    .then(function(response){
-        return response;
-    });    
+ const _positionBook = (ce1, pe1) =>  {
+    return zebu.post('api/positionAndHoldings/positionBook', { "ret":"NET"})               
+    .then(function(resp) {
+        appendToDOM(resp, "position book");   
+        const positionBook = resp.data;
+        let direction = 0;                        
+        // are we in any position                          
+        for(let i = 0; i < positionBook.length; i++) {                            
+            // PUT sell                    
+            if( positionBook[i].Tsym == pe1 && positionBook[i].Netqty > 0) {
+                direction = -1;                      
+            }
+            // CALL sell
+            else if( positionBook[i].Tsym == ce1 && positionBook[i].Netqty > 0) {
+                direction = 1;   
+            }                    
+        }  // end for      
+        return direction;               
+     });                
 }
 
- function longOnlyTrades (ul1, ce1, pe1) {                 
+const _getScripQuoteDetails = (Tkn) =>  {
+    return zebu.post('api/ScripDetails/getScripQuoteDetails', {"exch":"NFO","symbol":Tkn }) 
+    .then(function(resp) {
+        appendToDOM(resp, "scrip quote details");
+        return resp.data;
+    });    
+} 
     
+async function longOnlyTrades  (ul1, ce1, pe1)  {                    
     let ulTkn  = localStorage.getItem(ul1);    
     let ceTkn  = localStorage.getItem(ce1);
-    let peTkn  = localStorage.getItem(pe1);                   
-    direction  = 0;          
-    price      = 1;    
-    axios.all([
-        zebu.post('api/positionAndHoldings/positionBook', { "ret":"NET"}),                
-        zebu.post('api/ScripDetails/getScripQuoteDetails', {"exch":"NFO","symbol":ulTkn })        
-    ])    
-    .then(responseArr => {                                     
-            appendToDOM(responseArr[0], "trade data");                                    
-            const positionBook = responseArr[0].data;
-            // are we in any position                          
-            for(let i = 0; i < positionBook.length; i++) {                            
-                // PUT sell                    
-                if( positionBook[i].Tsym == pe1 && positionBook[i].Netqty > 0) {
-                    direction = -1;                      
-                }
-                // CALL sell
-                else if( positionBook[i].Tsym == ce1 && positionBook[i].Netqty > 0) {
-                    direction = 1;   
-                }                    
-            }           
+    let peTkn  = localStorage.getItem(pe1);    
     
-            // is stop in place. get stop loss              
-                _orderStatus().then((resp) => {             
-                    appendToDOM(resp, "order status");      
-                    const orders = resp.data;                
-                    noOfOrders = orders.length;                              
-                    if (noOfOrders === null || typeof noOfOrders === 'undefined')                         
-                        noOfOrders = 0  
-                    for(let j = 0; j < noOfOrders; j++) {                                                
-                        if( orders[j].Trsym == pe1 && orders[j].Status == "trigger pending") {                            
-                            isStop = parseInt(orders[j].Nstordno)                            
-                        }
-                        if( orders[j].Trsym == ce1 && orders[j].Status == "trigger pending") {
-                            isStop = parseInt(orders[j].Nstordno)                            
-                        }                                            
-                    } // end for
-                });                
-            
-            // exits and entry     
-            ulData = responseArr[1].data;         
-            appendToDOM(responseArr[1], "Checking Underlying");
-            if (ulData.stat == "Ok") {                                
-                open = parseInt(ulData.openPrice);     
-                high = parseInt(ulData.High);
-                low  = parseInt(ulData.Low);                                                 
+    // TODO convert price to let statement
+    price      = 1;    
+    
+    let direction = await _positionBook(ce1, pe1);      
+    let stopOrderNo  = await _orderStatus(ce1, pe1);    
+    let ulData = await _getScripQuoteDetails(ulTkn);          
+                      
+    const open = parseInt(ulData.openPrice);     
+    const high = parseInt(ulData.High);
+    const low  = parseInt(ulData.Low);          
 
-                levels = {
-                    '1': open * factor * 0.236,                 
-                    '2': open * factor * 0.382, 
-                    '3': open * factor * 0.5,                    
-                    '4': open * factor * 0.618,
-                    '5': open * factor * 0.786,                    
-                    '6': open * factor * 1.236,
-                    '7': open * factor * 1.618
-                  };               
-
-                const lentry    = eval(open + levels['1']);
-                const sentry    = open - levels['1'];
-                const tgtinpts  = parseInt(open * factor * trade.target_ratio);   
-                const lngtrail  = lentry + (( high - lentry ) /2);
-                const srttrail  = sentry - (( sentry - low ) /2);                      
-
-                const printable = {
-                    "<< LTP >>": parseInt(ulData.LTP),
-                    "* OPEN_ *":  open,
-                    "+ HIGH_ +": high,
-                    "- _LOW_ -": low,                      
-                    "+ MAXIM +": open + levels['7'],
-                    "+ TARGT +": open + tgtinpts,
-                    "+ 0.382 +": open + levels['2'],                                            
-                    "+ STOP_ +": parseInt(open + levels['1'] - trade.stop1),
-                    "+ TRAIL +": lngtrail,
-                    "+ ENTRY +": open + levels['1'],                      
-                    "- STOP_ -": parseInt(open + eval(trade.stop1) - levels['1']),
-                    "- ENTRY -": open - levels['1'],                      
-                    "- TRAIL -": srttrail,
-                    "- 0.382 -": open - levels['2'],
-                    "- TARGT -": open - tgtinpts,                      
-                    "- MAXIM -": open - levels['7']
-                }
-
-                drawLvlTable( printable );
-                  
-                // long call option exit
-                if (direction == 1 && isStop > 0)                     
-                {                       
-                    _show_progress ( direction, printable['+ ENTRY +'], ulData.LTP, printable['+ TARGT +'], printable['+ STOP_ +'] );                                               
-                    if  
-                    ( // trail condition                         
-                        ulData.LTP > eval(open + levels['2'])            
-                    )    
-                    {                                                
-                        if ( trail50(ulData.LTP, lngtrail, srttrail) )
-                        { 
-                            _pstModifyOrder ("SELL", ce1, qty=trade.qty1, ordr_typ="MKT", prc="00.00", isStop, trade.validity);
-                        }                                                        
-                    }
-                    else if 
-                    ( // exit
-                        ( ulData.LTP > parseInt( open + tgtinpts))                                              
-                        || !IsTradeTime(ulData.exchFeedTime, trade.squareoff)    
-                        || ulData.LTP < ( open - trade.stop1)                                     
-                    )
-                    {                               
-                        _pstModifyOrder ("SELL", ce1, qty=trade.qty1, ordr_typ="MKT", prc="00.00", isStop, trade.validity);                                                        
-                    }               
-                }                              
-                     
-                // long put option exit
-                if (direction == -1 && isStop > 0 )                
-                {                      
-                    _show_progress ( direction, printable['+ ENTRY +'], ulData.LTP, printable['+ TARGT +'], printable['+ STOP_ +'] );                                                                   
-                    
-                    if (ulData.LTP < eval(open - levels['2']) )
-                    {                               
-                        if( trail50(ulData.LTP, lngtrail, srttrail) ) {
-                            _pstModifyOrder ("SELL", pe1, qty=trade.qty1, ordr_typ="MKT", prc="00.00", isStop, trade.validity);                                                        
-                        }
-                    }                                                                   
-                    else if
-                    (
-                    (ulData.LTP < parseInt( open - tgtinpts))                         
-                    || !IsTradeTime(ulData.exchFeedTime, trade.squareoff)
-                    || ulData.LTP > (open + trade.stop1)
-                    )
-                    {                            
-                        _pstModifyOrder ("SELL", pe1, qty=trade.qty1, ordr_typ="MKT", prc="00.00", isStop, trade.validity);                                                        
-                    }  
-                }                                          
-               
-                
-                if ( // entries
-                    (noOfOrders < parseInt(trade.allowed * 2) - 1)                   
-                    && (direction == 0) 
-                ) {                    
-                    console.log(ulData.LTP <= ( open - levels['1']) && trade.sellorbuy <=0);
-                    console.log(ulData.LTP >= (open + levels['1']) && trade.sellorbuy >=0)
-                    _show_progress ( direction, open, ulData.LTP, printable['+ ENTRY +'], printable['- ENTRY -'] ); 
-                    if (      // long call option entry                   
-                        ulData.LTP >= (open + levels['1']) && trade.sellorbuy >=0
-                        && ulData.LTP <= (open + levels['1'] + parseInt(trade.slip)) 
-                        && (high < open+levels['2'])
-                    ) 
-                    {                           
-                       _pstLtp(ceTkn).then((resp) => {                   
-                                appendToDOM(resp, "long entry and stop");
-                                const scripDetails = resp.data;
-                                const ltp = parseFloat(scripDetails.LTP);                                     
-                                if(ltp>trade.stop1) { price = ltp-trade.stop1; }                                                                                            
-                                _pstPlaceOrder("BUY", ce1, ceTkn, qty=trade.qty1, ordr_typ="MKT", prc="", trade.validity);                                
-                                _pstPlaceOrder ("SELL", ce1, ceTkn, qty=trade.qty1, ordr_typ="SL-M", prc=price,trade.validity);                             
-                                index();
-                        });                                     
-                    }
-                    else if (      // long put option entry                                                             
-                         ulData.LTP <= ( open - levels['1']) && trade.sellorbuy <=0
-                         && ulData.LTP >= ( open - levels['1'] - parseInt(trade.slip))
-                         && (low > open-levels['2'])
-                    ) {                         
-                         _pstLtp(peTkn).then((resp) => {                   
-                                appendToDOM(resp, "short entry and stop");
-                                const scripDetails = resp.data
-                                const ltp = parseFloat(scripDetails.LTP);                                     
-                                if(ltp>trade.stop1) { price = parseInt(ltp-trade.stop1); }
-                                _pstPlaceOrder ("BUY", pe1, peTkn, qty=trade.qty1, ordr_typ="MKT", prc="" ,trade.validity);                                
-                                _pstPlaceOrder ("SELL", pe1, peTkn, qty=trade.qty1, ordr_typ="SL-M", prc=price,trade.validity);                                                                                                                                           
-                                index();
-                        });  
-                                    
-                    }    
-                } // end of entries    
-                else { 
-                    console.log("no of orders ",(noOfOrders/2)," > allowed orders ",trade.allowed) 
-                }                                                
-                                       
-            }                       
-      }) // end of response arr2                      
-      .catch(function (error) {
-        if (error.response) {
-          console.log(error.response.data);
-          console.log(error.response.status);              
+    levels = {
+        '1': open * factor * 0.236,                 
+        '2': open * factor * 0.382, 
+        '3': open * factor * 0.5,                    
+        '4': open * factor * 0.618,
+        '5': open * factor * 0.786,                    
+        '6': open * factor * 1.236,
+        '7': open * factor * 1.618
+    };               
+    const lentry    = eval(open + levels['1']);
+    const sentry    = open - levels['1'];
+    const tgtinpts  = parseInt(open * factor * trade.target_ratio);   
+    const lngtrail  = lentry + (( high - lentry ) /2);
+    const srttrail  = sentry - (( sentry - low ) /2);         
+    const printable = {                    
+        "<< LTP >>": parseInt(ulData.LTP),
+        "* OPEN_ *":  open,
+        "+ HIGH_ +": high,
+        "- _LOW_ -": low,                      
+        "+ MAXIM +": open + levels['7'],
+        "+ TARGT +": open + tgtinpts,
+        "+ 0.382 +": open + levels['2'],                                            
+        "+ STOP_ +": parseInt(open + levels['1'] - trade.stop1),
+        "+ TRAIL +": lngtrail,
+        "+ ENTRY +": open + levels['1'],                      
+        "- STOP_ -": parseInt(open + eval(trade.stop1) - levels['1']),
+        "- ENTRY -": open - levels['1'],                      
+        "- TRAIL -": srttrail,
+        "- 0.382 -": open - levels['2'],
+        "- TARGT -": open - tgtinpts,                      
+        "- MAXIM -": open - levels['7']
+    }
+    drawLvlTable( printable );
+        
+    // is stop in place
+    if (stopOrderNo > 0) {        
+        if (direction == 1)                     
+        {                       
+            _show_progress ( direction, printable['+ ENTRY +'], ulData.LTP, printable['+ TARGT +'], printable['+ STOP_ +'] );                                               
+            // trail condition      
+            if(ulData.LTP > eval(open + levels['2']))    
+            {                                                
+                if ( trail50(ulData.LTP, lngtrail, 0) )                     
+                _pstModifyOrder ("SELL", ce1, qty=trade.qty1, ordr_typ="MKT", prc="00.00", stopOrderNo, trade.validity);                               
+            }
+            else if // exit
+            ( 
+                ( ulData.LTP > parseInt( open + tgtinpts))                                              
+                || !IsTradeTime(ulData.exchFeedTime, trade.squareoff)    
+                || ulData.LTP < ( open - trade.stop1)                                     
+            )        
+                _pstModifyOrder ("SELL", ce1, qty=trade.qty1, ordr_typ="MKT", prc="00.00", stopOrderNo, trade.validity);                                                                        
+        }  // short entry           
+        else if (direction == -1)                
+        {                      
+            _show_progress ( direction, printable['+ ENTRY +'], ulData.LTP, printable['+ TARGT +'], printable['+ STOP_ +'] );                                                                   
+            // trail condition    
+            if (ulData.LTP < eval(open - levels['2']) )
+            {                               
+                if( trail50(ulData.LTP, 0, srttrail) ) 
+                _pstModifyOrder ("SELL", pe1, qty=trade.qty1, ordr_typ="MKT", prc="00.00", stopOrderNo, trade.validity);                                                                            
+            } else if // exit
+            (
+            ( ulData.LTP < parseInt( open - tgtinpts) )                         
+            || !IsTradeTime(ulData.exchFeedTime, trade.squareoff)
+            || ulData.LTP > (open + trade.stop1)
+            )                                         
+                _pstModifyOrder ("SELL", pe1, qty=trade.qty1, ordr_typ="MKT", prc="00.00", stopOrderNo, trade.validity);                                                        
         }
-        });                 
-
-        sleep(6100).then( () => {                 
-            longOnlyTrades(ul1, ce1, pe1);
-        })
+    }  // end of is  stop in place                                             
+        
+    if ( // entries
+        (noOfOrders < parseInt(trade.allowed * 2) - 1)                   
+        && (direction == 0) 
+    ) {                    
+        _show_progress ( direction, open, ulData.LTP, printable['+ ENTRY +'], printable['- ENTRY -'] ); 
+        if (      // long call option entry                   
+            ulData.LTP >= (open + levels['1']) && trade.sellorbuy >=0
+            && ulData.LTP <= (open + levels['1'] + parseInt(trade.slip)) 
+            && (high < open+levels['2'])
+        ) 
+        {                           
+            const scripDetails = await _getScripQuoteDetails(ceTkn);                                                                                  
+            const ltp = parseFloat(scripDetails.LTP);                                     
+            if(ltp>trade.stop1) { price = ltp-trade.stop1; }                                                                                            
+            _pstPlaceOrder("BUY", ce1, ceTkn, qty=trade.qty1, ordr_typ="MKT", prc="", trade.validity);                                
+            _pstPlaceOrder ("SELL", ce1, ceTkn, qty=trade.qty1, ordr_typ="SL-M", prc=price,trade.validity);                                                     
+            index();
+        } 
+        else if (      // long put option entry                                                             
+            ulData.LTP <= ( open - levels['1']) && trade.sellorbuy <=0
+            && ulData.LTP >= ( open - levels['1'] - parseInt(trade.slip))
+            && (low > open-levels['2'])
+        ) {                         
+            const scripDetails = await _getScripQuoteDetails(peTkn);                                                                        
+            const ltp = parseFloat(scripDetails.LTP);                                     
+            if(ltp>trade.stop1) { price = parseInt(ltp-trade.stop1); }
+            _pstPlaceOrder ("BUY", pe1, peTkn, qty=trade.qty1, ordr_typ="MKT", prc="" ,trade.validity);                                
+            _pstPlaceOrder ("SELL", pe1, peTkn, qty=trade.qty1, ordr_typ="SL-M", prc=price,trade.validity);                                                                                                                                                                                                   
+            index();
+        }    
+    } // end of entries    
+    else if (direction==0){             
+        console.log("no of orders ",noOfOrders," < trades",(trade.allowed*2)-1,": ", noOfOrders < (trade.allowed*2)-1) 
+    }          
+    
+    sleep(5000).then( () => {                 
+      longOnlyTrades(ul1, ce1, pe1);
+    })
 }
 
 /* 4 generate long option scrip names from underlying */
@@ -532,9 +471,7 @@ function longScripsFromUl(ul, ulTkn) {
              ulData = resp.data;                                
                 if (ulData.stat == "Ok") {                                    
                     const open = parseInt(ulData.openPrice);                    
-                    const factinpts = open * factor * 0.236;                                                                            
-
-                    const sellstrike = _findITMStrike(open-factinpts,"PE");
+                    const factinpts = open * factor * 0.236;                      const sellstrike = _findITMStrike(open-factinpts,"PE");
                     const pe1 = trade.base1 + trade.week + sellstrike + "PE";
                     createCookie("pe1",pe1,0)                                        
                     tknFmScrip(pe1);
@@ -542,15 +479,7 @@ function longScripsFromUl(ul, ulTkn) {
                     const longstrike = _findITMStrike(open+factinpts,"CE");
                     const ce1 = trade.base1 + trade.week + longstrike  + "CE";
                     createCookie("ce1", ce1, 0);                                                                                                    
-                    tknFmScrip(ce1);                                      
-                    
-                    /* scrips = {                       
-                        "pe1": pe1,
-                        "ce1": ce1
-                        };       
-
-                    _getScripTokens();
-                    */                                     
+                    tknFmScrip(ce1);                                                                      
                     
                     if(localStorage.getItem(pe1)!=null && localStorage.getItem(ce1)!=null)
                     {                    
@@ -619,8 +548,6 @@ const _setZebuAxios = () => {
         zebu.defaults.baseURL = 'https://www.zebull.in/rest/MobullService/';   
     }       
 }
-
-
 /* -----------------------------------------------    */
 //       bootstrap script                            //
 /* -----------------------------------------------    */
